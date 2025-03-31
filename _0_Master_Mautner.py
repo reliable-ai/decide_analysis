@@ -22,17 +22,17 @@ from config import (
 )
 
 # Import processing functions from each module
-from identify_unemployment_Mautner import process_unemployment
-from siab_bio_Mautner import process_biography
-from establishment_info_Mautner import process_establishments
-from industries_1digit_destatis_Mautner import process_industries
-from industries_1digit_iab_Mautner import map_industries
-from occ_blossfeld_Mautner import process_occupations
-from educ_imputation_Mautner import process_education
-from wages_deflation_Mautner import process_wages
-from index_entries_Mautner import process_entries
-from employment_history_Mautner import process_employment
-from reshape_data_Mautner import process_reshape
+from _01_Identify_unemployment_Mautner import process_unemployment
+from _02_SIAB_bio_Mautner import process_biography
+from _03a_Establishment_info_20180515_Mautner import process_establishments
+from _03b_industries_1digit_destatis_Mautner import process_industries
+from _03c_industries_1digit_iab_Mautner import map_industries
+from _03d_occ_blossfeld_Mautner import process_occupations
+from _03e_educ_imputation_Mautner import process_education
+from _03f_wages_deflation_Mautner import process_wages
+from _04_Index_entries_Mautner import process_entries
+from _05_Employment_history_Mautner import process_employment
+from _06_Reshape_data_Mautner import process_reshape
 
 # Remove redundant configuration
 create_directories()  # Create required directories
