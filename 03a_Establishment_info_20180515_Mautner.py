@@ -9,11 +9,17 @@ import pandas as pd
 import numpy as np
 import os
 
-def add_establishment_info(siab_data):
-    """Add establishment information to SIAB data."""
+def process_establishments(df):
+    """Add establishment information from BHP data to SIAB records.
 
+    Args:
+        df (pd.DataFrame): Input SIAB data frame
+
+    Returns:
+        pd.DataFrame: Data frame with added establishment information
+    """
     # Rename year column for merge
-    siab_data = siab_data.rename(columns={'year': 'jahr'})
+    df = df.rename(columns={'year': 'jahr'})
 
     # Load and merge BHP data
     bhp_path = "/Users/ruben/Downloads/FinaleVersionUnterlagen/orig/SIAB_7514_v1_bhp_basis_v1.dta"
@@ -21,7 +27,7 @@ def add_establishment_info(siab_data):
 
     # Merge on establishment and year
     merged_data = pd.merge(
-        siab_data,
+        df,
         bhp_data,
         on=['betnr', 'jahr'],
         how='left',
@@ -47,17 +53,7 @@ def add_establishment_info(siab_data):
     merged_data = merged_data.drop('_merge', axis=1)
     merged_data = merged_data.rename(columns={'jahr': 'year'})
 
-    # Save processed data
-    output_path = "/Users/ruben/Downloads/FinaleVersionUnterlagen/data/siab_r_7517_v1_sample_estab.dta"
-    merged_data.to_stata(output_path, write_index=False)
-
     return merged_data
 
 if __name__ == "__main__":
-    # Load the SIAB data
-    data_path = "/Users/ruben/Downloads/FinaleVersionUnterlagen/data/siab_r_7517_v1_sample_bio_HM.dta"
-    if os.path.exists(data_path):
-        siab_data = pd.read_stata(data_path)
-        add_establishment_info(siab_data)
-    else:
-        print(f"Data file not found: {data_path}")
+    print("This script should be run as part of the master SIAB processing pipeline")

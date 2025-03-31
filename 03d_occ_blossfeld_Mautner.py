@@ -72,5 +72,16 @@ def classify_blossfeld(df):
 
     return df
 
+def process_occupations(df):
+    """Create Blossfeld occupation classifications.
+
+    Args:
+        df (pd.DataFrame): Input SIAB data frame
+
+    Returns:
+        pd.DataFrame: Data frame with added occupation classifications
+    """
+    return classify_blossfeld(df)
+
 if __name__ == "__main__":
     print("This script should be run as part of the master SIAB processing pipeline")

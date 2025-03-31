@@ -11,9 +11,15 @@ Converted to Python
 import pandas as pd
 import numpy as np
 
-def index_entries(df):
-    """Index unemployment entries for each person."""
+def process_entries(df):
+    """Index unemployment entries for each person.
 
+    Args:
+        df (pd.DataFrame): Input SIAB data frame
+
+    Returns:
+        pd.DataFrame: Data frame with indexed unemployment entries
+    """
     # Create temporary dataframe with only unemployment entries 2010-2017
     entries_df = df[
         (df['beg_ue'] == 1) &

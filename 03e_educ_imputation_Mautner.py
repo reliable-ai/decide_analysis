@@ -11,9 +11,15 @@ Converted to Python
 import pandas as pd
 import numpy as np
 
-def impute_education(df):
-    """Impute education values following Fitzenberger et al. (2008)."""
+def process_education(df):
+    """Impute education values following Fitzenberger et al. (2008).
 
+    Args:
+        df (pd.DataFrame): Input SIAB data frame
+
+    Returns:
+        pd.DataFrame: Data frame with imputed education values
+    """
     # Generate new education variable
     df['ausbildung_imp'] = df['ausbildung'].copy()
 

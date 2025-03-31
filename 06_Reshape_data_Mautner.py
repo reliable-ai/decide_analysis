@@ -11,9 +11,15 @@ Converted to Python
 import pandas as pd
 import numpy as np
 
-def reshape_data(df):
-    """Reshape and clean data for machine learning preparation."""
+def process_reshape(df):
+    """Reshape and prepare data for machine learning models.
 
+    Args:
+        df (pd.DataFrame): Input SIAB data frame
+
+    Returns:
+        pd.DataFrame: Reshaped and cleaned data frame ready for ML
+    """
     # Handle missings for deutsch
     df['deutsch'] = df['deutsch'].replace({99999: -1, '.a': -2})
     df['maxdeutsch'] = df.groupby('persnr')['deutsch'].transform('max')

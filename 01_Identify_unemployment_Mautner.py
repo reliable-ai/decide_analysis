@@ -33,17 +33,23 @@ import os
 # The script assumes that siab_data is available in the global environment
 # from the master script (0_Master_Mautner.py)
 
-def identify_unemployment(siab_data):
-    """Main function to identify unemployment episodes."""
+def process_unemployment(df):
+    """Process unemployment episodes in SIAB data.
 
+    Args:
+        df (pd.DataFrame): Input SIAB data frame
+
+    Returns:
+        pd.DataFrame: Data frame with added unemployment episode information
+    """
     # YEAR OF OBSERVATION AND AGE
-    siab_data['year'] = pd.DatetimeIndex(siab_data['begepi']).year
-    siab_data['age'] = siab_data['year'] - siab_data['gebjahr']
+    df['year'] = pd.DatetimeIndex(df['begepi']).year
+    df['age'] = df['year'] - df['gebjahr']
 
     # Keep only (X)ASU and MTH spells for identification of unemployment
     # In Stata this is done with a preserve/restore block
     # In Python, we'll use a separate DataFrame
-    ue_data = siab_data[siab_data['quelle_gr'].isin([4, 5])].copy()
+    ue_data = df[df['quelle_gr'].isin([4, 5])].copy()
 
     # 1. Identify spells when seeking for employment while being unemployed
     # Identify job seeking while being unemployed (seeking1)
@@ -154,7 +160,7 @@ def identify_unemployment(siab_data):
     ue_data = ue_data[ue_cols]
 
     # Merge with the original data (similar to Stata's restore)
-    merged_data = pd.merge(siab_data, ue_data, on=['persnr', 'spell'], how='left')
+    merged_data = pd.merge(df, ue_data, on=['persnr', 'spell'], how='left')
 
     # 4 Identify STUE and LTUE populations
     # 4.1 Find exits into employment
@@ -304,22 +310,9 @@ def identify_unemployment(siab_data):
         if col in merged_data.columns:
             merged_data[col].attrs['label_de'] = label
 
-    # Save the data
-    output_path = "/Users/ruben/Downloads/FinaleVersionUnterlagen/data/SIAB_sample_UEidenfidied.dta"
-    merged_data.to_stata(output_path, write_index=False)
-
     # Return the processed data for use in the master script
     return merged_data
 
-# This code runs when the script is executed directly
 if __name__ == "__main__":
-    # Load the data (this is just for testing)
-    data_path = "/Users/ruben/Downloads/FinaleVersionUnterlagen/orig/siab_r_7517_v1_stata/siab_r_7517_v1.dta"
-    if os.path.exists(data_path):
-        siab_data = pd.read_stata(data_path)
-        identify_unemployment(siab_data)
-    else:
-        print(f"Data file not found: {data_path}")
-else:
-    # When imported as a module, don't run anything
-    pass
+    # This script should be run as part of the master SIAB processing pipeline
+    print("This script should be run as part of the master SIAB processing pipeline")

@@ -53,5 +53,16 @@ def deflate_wages(df):
 
     return df
 
+def process_wages(df):
+    """Deflate wages using CPI data with 2015 as base year.
+
+    Args:
+        df (pd.DataFrame): Input SIAB data frame
+
+    Returns:
+        pd.DataFrame: Data frame with deflated wages
+    """
+    return deflate_wages(df)
+
 if __name__ == "__main__":
     print("This script should be run as part of the master SIAB processing pipeline")

@@ -12,9 +12,15 @@ Converted to Python
 import pandas as pd
 import numpy as np
 
-def process_employment_history(df):
-    """Process employment history for all individuals."""
+def process_employment(df):
+    """Process employment history for all individuals.
 
+    Args:
+        df (pd.DataFrame): Input SIAB data frame
+
+    Returns:
+        pd.DataFrame: Data frame with added employment history information
+    """
     # Initialize tracking variables
     df['lhgspell'] = df['quelle_gr'] == 3
     df['behspell'] = df['quelle_gr'] == 1
