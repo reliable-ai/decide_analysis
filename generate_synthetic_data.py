@@ -3,16 +3,14 @@ import pandas as pd
 import os
 from datetime import datetime, timedelta
 import random
+from config import (
+    ORIG_DIR,
+    DATANAME,
+    create_directories
+)
 
-# Create directories if they don't exist
-output_base_dir = "/Users/ruben/Downloads/FinaleVersionUnterlagen"
-for dir_path in [
-    f"{output_base_dir}/orig/siab_r_7517_v1_stata",
-    f"{output_base_dir}/data",
-    f"{output_base_dir}/log",
-    f"{output_base_dir}/prog Stata"
-]:
-    os.makedirs(dir_path, exist_ok=True)
+# Create required directories
+create_directories()
 
 # Set random seed for reproducibility
 np.random.seed(42)
@@ -157,8 +155,8 @@ for betnr in range(1, n_establishments + 1):
 bhp_data = pd.DataFrame(establishments)
 
 # Save the datasets in Stata format
-siab_path = f"{output_base_dir}/orig/siab_r_7517_v1_stata/siab_r_7517_v1.dta"
-bhp_path = f"{output_base_dir}/orig/siab_r_7517_v1_stata/SIAB_7514_v1_bhp_basis_v1.dta"
+siab_path = os.path.join(ORIG_DIR, f"{DATANAME}.dta")
+bhp_path = os.path.join(ORIG_DIR, "SIAB_7514_v1_bhp_basis_v1.dta")
 
 print(f"Saving SIAB microdata to {siab_path}")
 siab_data.to_stata(siab_path, write_index=False)

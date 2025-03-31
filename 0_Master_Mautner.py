@@ -16,6 +16,10 @@ import os
 import pandas as pd
 import numpy as np
 from datetime import datetime
+from config import (
+    ORIG_DIR, DATA_DIR, DATANAME,
+    create_directories
+)
 
 # Import processing functions from each module
 from identify_unemployment_Mautner import process_unemployment
@@ -30,29 +34,15 @@ from index_entries_Mautner import process_entries
 from employment_history_Mautner import process_employment
 from reshape_data_Mautner import process_reshape
 
-# --------------------------------------
-# PATHS CONFIGURATION
-base_dir = "/Users/ruben/Downloads/FinaleVersionUnterlagen"
-log_dir = f"{base_dir}/log"
-orig_dir = f"{base_dir}/orig/siab_r_7517_v1_stata"
-data_dir = f"{base_dir}/data"
-
-# Ensure directories exist
-for directory in [log_dir, data_dir]:
-    os.makedirs(directory, exist_ok=True)
-
-# --------------------------------------
-# FILENAMES AND SETTINGS
-date_str = "20180706_samp"
-dataname = "siab_r_7517_v1"
-logname = "siab_7514_v1_prep"
+# Remove redundant configuration
+create_directories()  # Create required directories
 
 def main():
     """Execute the complete SIAB data processing workflow."""
     print("Starting SIAB data processing...")
 
     # Load initial data
-    siab_data = pd.read_stata(os.path.join(orig_dir, f"{dataname}.dta"))
+    siab_data = pd.read_stata(os.path.join(ORIG_DIR, f"{DATANAME}.dta"))
     print(f"Loaded {len(siab_data)} records.")
 
     # 1. Process unemployment episodes
@@ -79,13 +69,13 @@ def main():
     siab_data = process_wages(siab_data)
 
     # Save intermediate state
-    siab_data.to_stata(os.path.join(data_dir, "beforereshaping.dta"))
+    siab_data.to_stata(os.path.join(DATA_DIR, "beforereshaping.dta"))
 
     # 4. Process unemployment entries
     siab_data = process_entries(siab_data)
 
     # Save before loop processing
-    siab_data.to_stata(os.path.join(data_dir, "beforeloop.dta"))
+    siab_data.to_stata(os.path.join(DATA_DIR, "beforeloop.dta"))
 
     # 5. Process each entry
     master_data = None
@@ -94,7 +84,7 @@ def main():
 
         # Load fresh data for each iteration except first
         if entry_num > 1:
-            siab_data = pd.read_stata(os.path.join(data_dir, "beforeloop.dta"))
+            siab_data = pd.read_stata(os.path.join(DATA_DIR, "beforeloop.dta"))
 
         # Tag relevant unemployment entry
         siab_data['relevant_ue'] = np.where(siab_data['nrEntry'] == entry_num, 1, np.nan)
@@ -103,11 +93,11 @@ def main():
 
         # Process employment history
         entry_data = process_employment(entry_data)
-        entry_data.to_stata(os.path.join(data_dir, f"beforedropping{entry_num}.dta"))
+        entry_data.to_stata(os.path.join(DATA_DIR, f"beforedropping{entry_num}.dta"))
 
         # Reshape data
         entry_data = process_reshape(entry_data)
-        entry_data.to_stata(os.path.join(data_dir, f"ready_entry{entry_num}.dta"))
+        entry_data.to_stata(os.path.join(DATA_DIR, f"ready_entry{entry_num}.dta"))
 
         # Append to master data
         if master_data is None:
@@ -116,7 +106,7 @@ def main():
             master_data = pd.concat([master_data, entry_data], ignore_index=True)
 
     # Save final dataset
-    master_data.to_stata(os.path.join(data_dir, "_forR.dta"))
+    master_data.to_stata(os.path.join(DATA_DIR, "_forR.dta"))
     print("Data processing complete!")
 
 if __name__ == "__main__":
