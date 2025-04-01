@@ -12,6 +12,7 @@ DATE_STR = "20180706_samp"
 DATANAME = "siab_r_7517_v1"
 LOGNAME = "siab_7514_v1_prep"
 
+
 # Ensure required directories exist
 def create_directories():
     """Create all required directories if they don't exist."""

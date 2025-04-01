@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-#------------------------------------------------------------------------------------------------#
+# ------------------------------------------------------------------------------------------------#
 #                                MASTER SCRIPT FOR SIAB DATA PREPARATION
-#------------------------------------------------------------------------------------------------#
+# ------------------------------------------------------------------------------------------------#
 
 """
 Authors:         Hannah Mautner (original Stata code)
@@ -15,11 +15,7 @@ This script orchestrates the entire data processing workflow for SIAB data.
 import os
 import pandas as pd
 import numpy as np
-from datetime import datetime
-from config import (
-    ORIG_DIR, DATA_DIR, DATANAME,
-    create_directories
-)
+from config import ORIG_DIR, DATA_DIR, DATANAME, create_directories
 
 # Import processing functions from each module
 from _01_Identify_unemployment_Mautner import process_unemployment
@@ -36,6 +32,7 @@ from _06_Reshape_data_Mautner import process_reshape
 
 # Remove redundant configuration
 create_directories()  # Create required directories
+
 
 def main():
     """Execute the complete SIAB data processing workflow."""
@@ -87,9 +84,13 @@ def main():
             siab_data = pd.read_stata(os.path.join(DATA_DIR, "beforeloop.dta"))
 
         # Tag relevant unemployment entry
-        siab_data['relevant_ue'] = np.where(siab_data['nrEntry'] == entry_num, 1, np.nan)
-        siab_data['ue_pop'] = siab_data.groupby('persnr')['relevant_ue'].transform('max')
-        entry_data = siab_data[siab_data['ue_pop'] == 1].copy()
+        siab_data["relevant_ue"] = np.where(
+            siab_data["nrEntry"] == entry_num, 1, np.nan
+        )
+        siab_data["ue_pop"] = siab_data.groupby("persnr")["relevant_ue"].transform(
+            "max"
+        )
+        entry_data = siab_data[siab_data["ue_pop"] == 1].copy()
 
         # Process employment history
         entry_data = process_employment(entry_data)
@@ -108,6 +109,7 @@ def main():
     # Save final dataset
     master_data.to_stata(os.path.join(DATA_DIR, "_forR.dta"))
     print("Data processing complete!")
+
 
 if __name__ == "__main__":
     main()
