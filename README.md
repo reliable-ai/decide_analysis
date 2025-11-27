@@ -17,3 +17,9 @@ We're using `ruff` for formatting of code. You can autoformat and lint code by r
 ```bash
 ruff check . --fix && ruff format .
 ```
+
+## Loading Data
+
+As the data files are highly sensitive and need to stay encrypted, we use different approaches to loading data for different platforms.
+
+Data loading code is located in `read_data/read_data.py`, which is not tracked in version control. You can find a boilerplate version of this file in `read_data/_read_data.py`.
