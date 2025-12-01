@@ -18,6 +18,20 @@ We're using `ruff` for formatting of code. You can autoformat and lint code by r
 ruff check . --fix && ruff format .
 ```
 
+### Tests
+
+Tests are located in the `tests/` directory. You can run all tests using `pytest`:
+
+```bash
+uv run pytest
+```
+
+Among other types, the project uses snapshot tests via `syrupy` 📸. To update snapshots, run:
+
+```bash
+uv run pytest --update-snapshots
+```
+
 ## Loading Data
 
 As the data files are highly sensitive and need to stay encrypted, we use different approaches to loading data for different platforms.
