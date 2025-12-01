@@ -1,4 +1,4 @@
-from read_data.read_data import read_data
+from src.read_data.read_data import read_data
 
 
 def test_read_data():

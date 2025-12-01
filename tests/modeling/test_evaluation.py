@@ -1,5 +1,5 @@
 import numpy as np
-from modeling.evaluation import evaluate_predictions
+from src.modeling.evaluation import evaluate_predictions
 
 
 def test_evaluate_predictions_basic():

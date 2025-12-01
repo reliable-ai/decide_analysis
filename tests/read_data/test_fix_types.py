@@ -1,5 +1,5 @@
 import pandas as pd
-from read_data.fix_types import fix_data_types
+from src.read_data.fix_types import fix_data_types
 
 
 def test_fix_data_types_converts_dates():

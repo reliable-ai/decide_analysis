@@ -1,5 +1,5 @@
 import pandas as pd
-from read_data.translate_names import translate_to_english
+from src.read_data.translate_names import translate_to_english
 
 
 def test_translate_to_english_renames_columns():

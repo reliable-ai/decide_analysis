@@ -1,6 +1,6 @@
 import pytest
 import pandas as pd
-from modeling.setup import select_features, select_target
+from src.modeling.setup import select_features, select_target
 
 
 def test_select_features_excludes_target():

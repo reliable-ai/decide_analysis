@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-from modeling.data_split import split_data
+from src.modeling.data_split import split_data
 
 
 def test_split_data_basic():
