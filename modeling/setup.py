@@ -24,27 +24,27 @@ def select_features(df: pd.DataFrame) -> pd.DataFrame:
     # Columns to exclude from features
     exclude_cols = [
         # Target variable
-        'ltue',
+        "ltue",
         # IDs and identifiers
-        'person_id',
-        'establishment_id',
-        'spell_count',
+        "person_id",
+        "establishment_id",
+        "spell_count",
         # Dates
-        'episode_start_date',
-        'episode_end_date',
-        'observation_start_date',
-        'observation_end_date',
-        'beg_ue_date',
-        'end_ue_date',
-        'next_employed_date',
-        'first_day_estab',
-        'first_day_job',
+        "episode_start_date",
+        "episode_end_date",
+        "observation_start_date",
+        "observation_end_date",
+        "beg_ue_date",
+        "end_ue_date",
+        "next_employed_date",
+        "first_day_estab",
+        "first_day_job",
         # Other metadata that shouldn't be used for prediction
-        'spell_source',
-        'beg_ue',
-        'end_ue',
-        'relevant_ue',
-        'ue_pop',
+        "spell_source",
+        "beg_ue",
+        "end_ue",
+        "relevant_ue",
+        "ue_pop",
     ]
 
     # Get all columns that are not in the exclude list
@@ -70,9 +70,9 @@ def select_target(df: pd.DataFrame) -> pd.Series:
     Returns:
         pd.Series: Target variable series
     """
-    if 'ltue' not in df.columns:
+    if "ltue" not in df.columns:
         raise ValueError("Target variable 'ltue' not found in dataframe")
 
-    y = df['ltue'].copy()
+    y = df["ltue"].copy()
 
     return y

@@ -13,7 +13,7 @@ def split_data(
     y: pd.Series,
     test_size: float = 0.2,
     random_state: int = 80539,
-    stratify: bool = True
+    stratify: bool = True,
 ):
     """
     Splits data into training and testing sets.
@@ -41,7 +41,7 @@ def split_data(
         y_clean,
         test_size=test_size,
         random_state=random_state,
-        stratify=stratify_param
+        stratify=stratify_param,
     )
 
     return X_train, X_test, y_train, y_test

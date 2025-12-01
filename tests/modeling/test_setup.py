@@ -4,12 +4,14 @@ from modeling.setup import select_features, select_target
 
 
 def test_select_features_excludes_target():
-    df = pd.DataFrame({
-        "ltue": [0, 1, 0],
-        "person_id": [1, 2, 3],
-        "feature1": [10, 20, 30],
-        "feature2": [40, 50, 60]
-    })
+    df = pd.DataFrame(
+        {
+            "ltue": [0, 1, 0],
+            "person_id": [1, 2, 3],
+            "feature1": [10, 20, 30],
+            "feature2": [40, 50, 60],
+        }
+    )
     X = select_features(df)
     assert "ltue" not in X.columns
     assert "person_id" not in X.columns
@@ -17,11 +19,7 @@ def test_select_features_excludes_target():
 
 
 def test_select_features_keeps_predictors():
-    df = pd.DataFrame({
-        "ltue": [0, 1],
-        "age": [25, 30],
-        "female": [1, 0]
-    })
+    df = pd.DataFrame({"ltue": [0, 1], "age": [25, 30], "female": [1, 0]})
     X = select_features(df)
     assert len(X.columns) == 2
 

@@ -1,4 +1,3 @@
-import pytest
 import numpy as np
 from modeling.evaluation import evaluate_predictions
 

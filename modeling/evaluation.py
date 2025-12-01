@@ -29,7 +29,11 @@ def evaluate_predictions(y_true, y_pred, y_pred_proba=None):
 
     precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
     recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
-    f1 = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0.0
+    f1 = (
+        2 * (precision * recall) / (precision + recall)
+        if (precision + recall) > 0
+        else 0.0
+    )
 
     # Print evaluation
     print("=" * 60)
@@ -51,15 +55,15 @@ def evaluate_predictions(y_true, y_pred, y_pred_proba=None):
 
     # Return metrics as dictionary
     metrics = {
-        'accuracy': accuracy,
-        'precision': precision,
-        'recall': recall,
-        'f1_score': f1,
-        'confusion_matrix': cm,
-        'predictions': y_pred,
+        "accuracy": accuracy,
+        "precision": precision,
+        "recall": recall,
+        "f1_score": f1,
+        "confusion_matrix": cm,
+        "predictions": y_pred,
     }
 
     if roc_auc is not None:
-        metrics['roc_auc'] = roc_auc
+        metrics["roc_auc"] = roc_auc
 
     return metrics
