@@ -1,2 +1,5 @@
 # pycache
 __pycache__/
+
+# read_data.py file (Zach & Jan will need different functions for this)
+read_data/read_data.py
