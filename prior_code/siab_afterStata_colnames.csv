@@ -1,0 +1,110 @@
+colname,label
+persnr,Individual ID
+year,Year of episode
+quelle_gr,"Source of spell, grouped"
+begepi,Episode start date
+endepi,Episode end date
+alo_dau,Duration of unemployment
+ue_pop,NA
+nrEntry,NA
+beg_ue,Begin of unemployment (ASU spell)
+ue_duration,Duration of UE/AS-Episode
+ltue,Long-term unemployment (bin. var)
+employed_before,Any employment in 6 weeks before entry to unemployment
+receipt_leh_before,LeH receipt in 6 weeks before entry to unemployment
+receipt_lhg_before,LHG receipt in 6 weeks before entry to unemployment
+se_before,Any subsidized employment in 6 weeks before entry to unemployment
+ASU_notue_seeking_before,Registered as job seeking/ not UE in 6 weeks before entry to unemployment
+ASU_other_before,Registered with ASU register for other reason in 6 weeks before entry to unemplo
+break_before,No info about 6 weeks prior to entry to unemployment
+tsince_ein_erw1,Days since employment
+tsince_ein_erw1_cat,Days since employment (categorized)
+tsince_ft_lm_contact,Days since last labour market contact (full-time)
+tsince_lm_contact,Days since last labour market contact
+tsince_lm_contact_cat,Days since last labour market contact (cat.)
+tsince_ft_lm_contact_cat,Days since last labour market contact (full-time) (cat.)
+emp_total,No. seperate jobsa/employments
+est_total,No. different establishmets worked in
+emp1_total,No. seperate jobs/employments (w/o voc. training)
+emp1_total_dur,Tot. duration in employment (w/o voc. training)
+emp2_total_dur,"Tot. duration in employment (w/o voc. training, ?)"
+emp3_total_dur,"Tot. duration in employment (w/o voc. training, ?)"
+emp1_m_dur,Mean duration of jobs/employment (w/o voc. training)
+main_industry,Industry the person worked in longest
+industry1_destatis_tot_dur_1,NA
+industry1_destatis_tot_dur_2,NA
+industry1_destatis_tot_dur_3,NA
+industry1_destatis_tot_dur_4,NA
+industry1_destatis_tot_dur_5,NA
+industry1_destatis_tot_dur_6,NA
+industry1_destatis_tot_dur_7,NA
+industry1_destatis_tot_dur_8,NA
+industry1_destatis_tot_dur_9,NA
+industry1_destatis_tot_dur_10,NA
+industry1_destatis_tot_dur_11,NA
+industry1_destatis_tot_dur_12,NA
+industry1_destatis_tot_dur_13,NA
+industry1_destatis_tot_dur_14,NA
+secjob_tot_dur,Tot. duration more than one job
+minijob_tot_dur,Tot. duration in marginal employment
+ft_tot_dur,Tot. duration  in full-time employment
+befrist_tot_dur,Tot. duration more than one job
+leih_tot_dur,Tot. duration  in full-time employment
+lastjob_none,No info about previous jobs available
+lastjob_tot_dur,Duration of last job
+lastjob_parallel,Parallel job(s) during last job
+lastjob_type,Type of last job
+lastjob_pt,Last job was part-time
+lastjob_wage_defl,Deflated daily wage of last job
+lastjob_occblo,Occupation in last job
+lastjob_niveau,Niveau of last job
+lastjob_leih,Leiharbeit status of last job regarding
+lastjob_befrist,Short-term status of last job
+lastjob_educ,Education status during last job
+lastjob_ao_kreis,Working location during last job
+lastjob_industry_destatis,Industry of last establishment (Destatis)
+lastjob_type_noinfo,NA
+lastjob_parallel_noinfo,NA
+lastjob_pt_noinfo,NA
+lastjob_occblo_noinfo,NA
+lastjob_niveau_noinfo,NA
+lastjob_leih_noinfo,NA
+lastjob_befrist_noinfo,NA
+lastjob_educ_noinfo,NA
+lastjob_ao_kreis_noinfo,NA
+lastjob_industry_destatis_noinfo,NA
+LHG_total,No of times of ALG2 receipt
+LHG_tot_dur,Total duration of ALG2 receipt
+LHG_m_dur,Mean duration of ALG2 receipt
+LEH_total,No of times of LEH
+LEH_tot_dur,Total duration of LEH
+LEH_m_dur,Mean duration of LEH
+almp_total,No. of participations in ALMPs
+almp_tot_dur,Tot. duration of ALMPs
+almp_m_dur,Mean duration of ALMPs
+almp_aw_total,No of participations in ALMP (A&W)
+almp_aw_tot_dur,Total duration of ALMP (A&W)
+almp_aw_m_dur,Mean duration of ALMP (A&W)
+se_tot_dur,Tot. duration of subzidized employments
+tsince_lastseeking,Time since last unemployed/ job seeking-spell
+tsince_lastseeking_cat,NA
+seeking1_total,No. seperate unemployed/ job seeking-spells
+seeking1_tot_dur,Total duration of unemployed/ job seeking episodes
+seeking1_m_dur,mean duration of unemployed/ job seeking episodes
+age,Age at entry to unemployment
+frau,Gender
+german,German nationality
+ausbildung_imp,"Vocational training, imputed"
+togerman,Has changed nationality to German
+moves,No. of private relocations between Kreise
+moves_noinfo,NA
+relocated,Changed residence location since last job
+wo_east,Current location residence in eastern Germany
+niveau,Niveau of
+maxdeutsch,"most recent nationality, neg.value=mis"
+maxausbildung_imp,"most recent education, neg.value=mis"
+maxschule,"most recent school education, neg.value=mis"
+maxniveau,"most recent niveau of job, neg.value=mis"
+maxbula,most recent Bundesland
+maxpendler,most recent commute
+lastw08_gen_gr,most recent sector

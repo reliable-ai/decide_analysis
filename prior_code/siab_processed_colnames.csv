@@ -1,0 +1,165 @@
+colname,label
+persnr,Individual ID
+year,Year of episode
+nrEntry,NA
+ltue,Long-term unemployment (bin. var)
+employed_before,Any employment in 6 weeks before entry to unemployment
+receipt_leh_before,LeH receipt in 6 weeks before entry to unemployment
+receipt_lhg_before,LHG receipt in 6 weeks before entry to unemployment
+se_before,Any subsidized employment in 6 weeks before entry to unemployment
+ASU_notue_seeking_before,Registered as job seeking/ not UE in 6 weeks before entry to unemployment
+ASU_other_before,Registered with ASU register for other reason in 6 weeks before entry to unemplo
+break_before,No info about 6 weeks prior to entry to unemployment
+est_total,No. different establishmets worked in
+emp1_total,No. seperate jobs/employments (w/o voc. training)
+emp1_total_dur,Tot. duration in employment (w/o voc. training)
+emp1_m_dur,Mean duration of jobs/employment (w/o voc. training)
+industry1_destatis_tot_dur_1,NA
+industry1_destatis_tot_dur_2,NA
+industry1_destatis_tot_dur_3,NA
+industry1_destatis_tot_dur_4,NA
+industry1_destatis_tot_dur_5,NA
+industry1_destatis_tot_dur_6,NA
+industry1_destatis_tot_dur_7,NA
+industry1_destatis_tot_dur_8,NA
+industry1_destatis_tot_dur_9,NA
+industry1_destatis_tot_dur_10,NA
+industry1_destatis_tot_dur_11,NA
+industry1_destatis_tot_dur_12,NA
+industry1_destatis_tot_dur_13,NA
+industry1_destatis_tot_dur_14,NA
+secjob_tot_dur,Tot. duration more than one job
+minijob_tot_dur,Tot. duration in marginal employment
+ft_tot_dur,Tot. duration  in full-time employment
+befrist_tot_dur,Tot. duration more than one job
+leih_tot_dur,Tot. duration  in full-time employment
+lastjob_none,No info about previous jobs available
+lastjob_tot_dur,NA
+lastjob_parallel,NA
+lastjob_wage_defl,Deflated daily wage of last job
+LHG_total,No of times of ALG2 receipt
+LHG_tot_dur,Total duration of ALG2 receipt
+LHG_m_dur,Mean duration of ALG2 receipt
+LEH_total,No of times of LEH
+LEH_tot_dur,Total duration of LEH
+LEH_m_dur,Mean duration of LEH
+almp_total,No. of participations in ALMPs
+almp_tot_dur,Tot. duration of ALMPs
+almp_m_dur,Mean duration of ALMPs
+almp_aw_total,No of participations in ALMP (A&W)
+almp_aw_tot_dur,Total duration of ALMP (A&W)
+almp_aw_m_dur,Mean duration of ALMP (A&W)
+se_tot_dur,Tot. duration of subzidized employments
+seeking1_total,No. seperate unemployed/ job seeking-spells
+seeking1_tot_dur,Total duration of unemployed/ job seeking episodes
+seeking1_m_dur,mean duration of unemployed/ job seeking episodes
+age,Age at entry to unemployment
+moves,No. of private relocations between Kreise
+main_industry2,NA
+main_industry3,NA
+main_industry4,NA
+main_industry5,NA
+main_industry6,NA
+main_industry7,NA
+main_industry8,NA
+main_industry9,NA
+main_industry10,NA
+main_industry11,NA
+main_industry12,NA
+main_industry13,NA
+main_industry14,NA
+main_industry99999,NA
+tsince_ein_erw1_cat2,NA
+tsince_ein_erw1_cat3,NA
+tsince_ein_erw1_cat99999,NA
+tsince_lm_contact_cat2,NA
+tsince_lm_contact_cat3,NA
+tsince_lm_contact_cat4,NA
+tsince_lm_contact_cat5,NA
+tsince_ft_lm_contact_cat2,NA
+tsince_ft_lm_contact_cat3,NA
+tsince_ft_lm_contact_cat4,NA
+tsince_ft_lm_contact_cat5,NA
+tsince_lastseeking_cat3,NA
+tsince_lastseeking_cat4,NA
+tsince_lastseeking_cat5,NA
+tsince_lastseeking_cat6,NA
+tsince_lastseeking_cat7,NA
+tsince_lastseeking_cat99999,NA
+lastjob_type5,NA
+lastjob_type99999,NA
+lastjob_pt1,NA
+lastjob_pt99999,NA
+lastjob_niveau2,NA
+lastjob_niveau3,NA
+lastjob_niveau4,NA
+lastjob_niveau99999,NA
+lastjob_befrist1,NA
+lastjob_befrist99999,NA
+lastjob_leih1,NA
+lastjob_leih99999,NA
+lastjob_industry_destatis2,NA
+lastjob_industry_destatis3,NA
+lastjob_industry_destatis4,NA
+lastjob_industry_destatis5,NA
+lastjob_industry_destatis6,NA
+lastjob_industry_destatis7,NA
+lastjob_industry_destatis8,NA
+lastjob_industry_destatis9,NA
+lastjob_industry_destatis10,NA
+lastjob_industry_destatis11,NA
+lastjob_industry_destatis12,NA
+lastjob_industry_destatis13,NA
+lastjob_industry_destatis14,NA
+lastjob_industry_destatis99999,NA
+frau1,NA
+maxdeutsch1,NA
+maxdeutsch.Missing.,NA
+maxausbildung_imp2,NA
+maxausbildung_imp3,NA
+maxausbildung_imp4,NA
+maxausbildung_imp5,NA
+maxausbildung_imp6,NA
+maxausbildung_imp.Missing.,NA
+maxschule4,NA
+maxschule5,NA
+maxschule6,NA
+maxschule7,NA
+maxschule8,NA
+maxschule9,NA
+maxschule.Missing.,NA
+maxniveau2,NA
+maxniveau3,NA
+maxniveau4,NA
+maxniveau.Missing.,NA
+maxbula2,NA
+maxbula3,NA
+maxbula4,NA
+maxbula5,NA
+maxbula6,NA
+maxbula7,NA
+maxbula8,NA
+maxbula9,NA
+maxbula10,NA
+maxbula11,NA
+maxbula12,NA
+maxbula13,NA
+maxbula14,NA
+maxbula15,NA
+maxbula16,NA
+maxbula.Missing.,NA
+maxpendler2,NA
+maxpendler.Missing.,NA
+lastjob_parallel99999,NA
+emp1_total_dur_byage,Age at entry to unemployment
+secjob_tot_dur_byage,Age at entry to unemployment
+minijob_tot_dur_byage,Age at entry to unemployment
+ft_tot_dur_byage,Age at entry to unemployment
+befrist_tot_dur_byage,Age at entry to unemployment
+leih_tot_dur_byage,Age at entry to unemployment
+LHG_tot_dur_byage,Age at entry to unemployment
+LEH_tot_dur_byage,Age at entry to unemployment
+almp_tot_dur_byage,Age at entry to unemployment
+almp_aw_tot_dur_byage,Age at entry to unemployment
+se_tot_dur_byage,Age at entry to unemployment
+seeking1_tot_dur_byage,Age at entry to unemployment
