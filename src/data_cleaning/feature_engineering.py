@@ -23,7 +23,9 @@ import pandas as pd
 import numpy as np
 
 
-def identify_unemployment_episodes(df: pd.DataFrame) -> pd.DataFrame:
+def identify_unemployment_episodes(df: pd.DataFrame,
+                                   continuous_gap_threshold: int=42,
+                                   ) -> pd.DataFrame:
     """
     Identifies unemployment episodes and classifies them as short-term or
     long-term. This function is based on Stata code provided by Hannah Mautner.
@@ -97,7 +99,7 @@ def identify_unemployment_episodes(df: pd.DataFrame) -> pd.DataFrame:
     # tag spells that are part of continuous job seeking episode
     # add feature `continuous`: spells that are part of continuous job seeking episode
     # (gap <= 42 days means continuous)
-    ue_df["continuous"] = (ue_df["t_since_asu"] <= pd.Timedelta(days=42)).astype(int)
+    ue_df["continuous"] = (ue_df["t_since_asu"] <= pd.Timedelta(days=continuous_gap_threshold)).astype(int)
 
     # step 2: identify separate unemployment episodes
     # 2.1 - begin of unemployment: every spell that is not continuous
@@ -269,7 +271,11 @@ def identify_unemployment_episodes(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def generate_biographical_variables(df: pd.DataFrame) -> pd.DataFrame:
+def generate_biographical_variables(df: pd.DataFrame,
+                                    new_job_notif_threshold: int=92,
+                                    new_job_no_notif_threshold: int=366,
+                                    separate_benefit_threshold: int=10,
+                                    ) -> pd.DataFrame:
     """
     Generates biographical variables from longitudinal SIAB data. This function
     is based on Stata code provided by Johanna Eberle, Alexandra Schmucker,
@@ -618,8 +624,8 @@ def generate_biographical_variables(df: pd.DataFrame) -> pd.DataFrame:
 
         ### JUDGMENT CALL: thresholds for counting as new job (92 days, 366 days)
         # count as new job if gap > 92 days with end notification, or gap > 366 days
-        job_df.loc[(job_df["end"].shift(1) == 1) & (job_df["gap"] > 92), "job"] = np.nan
-        job_df.loc[job_df["gap"] > 366, "job"] = np.nan
+        job_df.loc[(job_df["end"].shift(1) == 1) & (job_df["gap"] > new_job_notif_threshold), "job"] = np.nan
+        job_df.loc[job_df["gap"] > new_job_no_notif_threshold, "job"] = np.nan
 
         # generate start date of job
         job_df["ein_job"] = job_df["episode_start_date"]
@@ -686,7 +692,7 @@ def generate_biographical_variables(df: pd.DataFrame) -> pd.DataFrame:
             & (leh_df["nrLeH"] == 1)
             & (
                 (leh_df["episode_start_date"] - leh_df["ende_vor_leh"])
-                > pd.Timedelta(days=10)
+                > pd.Timedelta(days=separate_benefit_threshold)
             )
         ).astype(int)
 
@@ -773,7 +779,7 @@ def generate_biographical_variables(df: pd.DataFrame) -> pd.DataFrame:
             & (lhg_df["nrLHG"] == 1)
             & (
                 (lhg_df["episode_start_date"] - lhg_df["ende_vor_lhg"])
-                > pd.Timedelta(days=10)
+                > pd.Timedelta(days=separate_benefit_threshold)
             )
         ).astype(int)
 
@@ -1372,11 +1378,13 @@ def generate_employment_history(df: pd.DataFrame, entry_number: int) -> pd.DataF
                     df.loc[df["lastjob_none"] == 1, col] = 99999
                     df[col] = df[col].fillna(99999)
 
-    # placeholder for cumulative employment-type durations (not implemented)
+    
     return df
 
 
-def index_unemployment_entries(df: pd.DataFrame) -> pd.DataFrame:
+def index_unemployment_entries(df: pd.DataFrame,
+                               year_range: list[int]=list(range(2010, 2018)),
+                               ) -> pd.DataFrame:
     """
     Indexes all entries into unemployment for each individual. This function
     is based on Stata code provided by Hannah Mautner.
@@ -1400,7 +1408,7 @@ def index_unemployment_entries(df: pd.DataFrame) -> pd.DataFrame:
 
     ### JUDGMENT CALL: why the choice of 2010-2017 specifically?
     # filter to only unemployment entries (beg_ue == 1) in years 2010-2017
-    entry_df = df[(df["beg_ue"] == 1) & (df["year"].isin(range(2010, 2018)))].copy()
+    entry_df = df[(df["beg_ue"] == 1) & (df["year"].isin(year_range))].copy()
 
     # sort by person and spell to ensure chronological order
     entry_df = entry_df.sort_values(["person_id", "spell_count"])

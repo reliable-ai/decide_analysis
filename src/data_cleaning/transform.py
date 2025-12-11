@@ -329,6 +329,9 @@ def reshape_data_for_ml(df: pd.DataFrame) -> pd.DataFrame:
     # keep only variables that exist in dataframe
     keep_vars = [v for v in keep_vars if v in df.columns]
 
+    # drop duplicates in keep_vars
+    keep_vars = list(set(keep_vars))
+
     df_final = df[keep_vars].copy()
 
     # order variables
@@ -342,6 +345,10 @@ def reshape_data_for_ml(df: pd.DataFrame) -> pd.DataFrame:
     # reorder columns
     existing_ordered = [v for v in ordered_vars if v in df_final.columns]
     remaining_cols = [v for v in df_final.columns if v not in existing_ordered]
-    df_final = df_final[existing_ordered + remaining_cols]
+    # drop duplicates in reordered columns
+    final_vars = list(set(existing_ordered + remaining_cols))
+
+    df_final = df_final[final_vars].copy()
+
 
     return df_final

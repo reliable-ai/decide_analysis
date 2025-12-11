@@ -5,10 +5,11 @@ This module contains functions for preparing data for machine learning models,
 including feature selection and target variable extraction.
 """
 
+from typing import Literal
 import pandas as pd
 
 
-def select_features(df: pd.DataFrame) -> pd.DataFrame:
+def select_features(df: pd.DataFrame, strategy: Literal["default"] = "default") -> pd.DataFrame:
     """
     Selects feature columns from the dataframe for modeling.
 
@@ -23,29 +24,23 @@ def select_features(df: pd.DataFrame) -> pd.DataFrame:
     """
     # Columns to exclude from features
     exclude_cols = [
-        # Target variable
         "ltue",
-        # IDs and identifiers
         "person_id",
-        "establishment_id",
-        "spell_count",
-        # Dates
+        "nrEntry",
+        "year",
+
+        # Normally excluded earlier?
+        "ue_duration",
         "episode_start_date",
         "episode_end_date",
-        "observation_start_date",
-        "observation_end_date",
-        "beg_ue_date",
-        "end_ue_date",
-        "next_employed_date",
-        "first_day_estab",
-        "first_day_job",
-        # Other metadata that shouldn't be used for prediction
-        "spell_source",
-        "beg_ue",
-        "end_ue",
-        "relevant_ue",
-        "ue_pop",
     ]
+
+    for col in exclude_cols:
+        if col not in df.columns:
+            print(
+                f"Warning: Column to exclude '{col}' not found in dataframe, "
+                "are the assumptions of the data met?"
+            )
 
     # Get all columns that are not in the exclude list
     feature_cols = [col for col in df.columns if col not in exclude_cols]
