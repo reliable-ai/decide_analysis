@@ -970,6 +970,9 @@ dev = [
     { name = "ruff" },
     { name = "syrupy" },
 ]
+scraping = [
+    { name = "beautifulsoup4" },
+]
 
 [package.metadata]
 requires-dist = [
@@ -984,6 +987,7 @@ dev = [
     { name = "ruff", specifier = ">=0.14.6" },
     { name = "syrupy", specifier = ">=5.0.0" },
 ]
+scraping = [{ name = "beautifulsoup4", specifier = ">=4.14.2" }]
 
 [[package]]
 name = "pexpect"
