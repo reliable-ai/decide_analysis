@@ -5,7 +5,6 @@ This module contains functions for preparing data for machine learning models,
 including feature selection and target variable extraction.
 """
 
-from typing import Literal
 import pandas as pd
 
 
