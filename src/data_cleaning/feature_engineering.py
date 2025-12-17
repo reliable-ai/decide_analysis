@@ -24,7 +24,7 @@ import numpy as np
 
 
 def identify_unemployment_episodes(df: pd.DataFrame,
-                                   continuous_gap_threshold: int=42,
+                                   spell_gap_threshold: int=42,
                                    ) -> pd.DataFrame:
     """
     Identifies unemployment episodes and classifies them as short-term or
@@ -40,6 +40,8 @@ def identify_unemployment_episodes(df: pd.DataFrame,
             columns include: person_id, spell_count, episode_start_date,
             episode_end_date, spell_source, employment_status_group,
             and birth_year.
+        spell_gap_threshold (int, optional): Threshold for gap size needed to
+            separate unemployment episodes. Default is 42 days.
 
     Returns:
         pd.DataFrame: Dataset with added unemployment identification variables:
@@ -99,7 +101,7 @@ def identify_unemployment_episodes(df: pd.DataFrame,
     # tag spells that are part of continuous job seeking episode
     # add feature `continuous`: spells that are part of continuous job seeking episode
     # (gap <= 42 days means continuous)
-    ue_df["continuous"] = (ue_df["t_since_asu"] <= pd.Timedelta(days=continuous_gap_threshold)).astype(int)
+    ue_df["continuous"] = (ue_df["t_since_asu"] <= pd.Timedelta(days=spell_gap_threshold)).astype(int)
 
     # step 2: identify separate unemployment episodes
     # 2.1 - begin of unemployment: every spell that is not continuous
@@ -292,6 +294,12 @@ def generate_biographical_variables(df: pd.DataFrame,
             episode_end_date, observation_start_date, spell_source,
             employment_status_group, establishment_id, daily_wage, part_time,
             termination_reason_group, and other employment-related variables.
+        new_job_notif_threshold (int, optional): Threshold for gap size needed
+            to separate jobs with notification. Default is 92 days.
+        new_job_no_notif_threshold (int, optional): Threshold for gap size
+            needed to separate jobs without notification. Default is 366 days.
+        separate_benefit_threshold (int, optional): Threshold for separating
+            benefit spells. Default is 10 days.
 
     Returns:
         pd.DataFrame: Dataset with added biographical variables including:
@@ -1397,6 +1405,8 @@ def index_unemployment_entries(df: pd.DataFrame,
     Args:
         df (pd.DataFrame): Dataset containing unemployment entry information.
             Expected columns include: person_id, spell_count, beg_ue, and year.
+        year_range (list[int]): Range of years to consider for indexing
+            unemployment entries. Default is 2010-2017.
 
     Returns:
         pd.DataFrame: Dataset with added 'nrEntry' column indicating the entry

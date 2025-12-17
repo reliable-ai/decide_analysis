@@ -8,8 +8,7 @@ def reshape_data_for_ml(df: pd.DataFrame) -> pd.DataFrame:
     Reshapes data for supervised learning models. This function is based on
     Stata code provided by Hannah Mautner.
 
-    The function restricts to the population of job seekers with unemployment
-    beginning in 2010-2013, generates predictor variables on person level
+    The function generates predictor variables on person level
     (employment history, ASU history, benefit history, measures history,
     biographical variables, current job seeking characteristics), creates the
     response/outcome variable (long-term unemployment indicator), and labels
