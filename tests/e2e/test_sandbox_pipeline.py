@@ -36,8 +36,8 @@ def test_sandbox_pipeline(snapshot):
     X, y = _run_sandbox_pipeline()
 
     # Snapshot the ordered list of column names
-    assert list(X.columns) == snapshot(name = "X: Columns")
+    assert list(X.columns) == snapshot(name="X: Columns")
 
     # Snapshot the shapes of features and target for stability
-    assert X.shape == snapshot(name = "X: Shape")
-    assert y.shape == snapshot(name = "y: Shape")
+    assert X.shape == snapshot(name="X: Shape")
+    assert y.shape == snapshot(name="y: Shape")

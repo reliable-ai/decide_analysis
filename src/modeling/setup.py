@@ -8,8 +8,9 @@ including feature selection and target variable extraction.
 import pandas as pd
 
 
-def select_features(df: pd.DataFrame,
-                    features: list[str] | None = None) -> pd.DataFrame:
+def select_features(
+    df: pd.DataFrame, features: list[str] | None = None
+) -> pd.DataFrame:
     """
     Selects feature columns from the dataframe for modeling.
 
@@ -25,7 +26,7 @@ def select_features(df: pd.DataFrame,
     Returns:
         pd.DataFrame: Dataframe containing only feature columns
     """
-    
+
     if features is not None:
         # if specific features are requested, use only those
         missing_features = [col for col in features if col not in df.columns]
@@ -33,7 +34,7 @@ def select_features(df: pd.DataFrame,
             raise ValueError(
                 f"Requested features not found in dataframe: {missing_features}"
             )
-    
+
         # validate that target/excluded columns aren't accidentally included
         exclude_cols = [
             "ltue",
@@ -45,7 +46,7 @@ def select_features(df: pd.DataFrame,
             "episode_start_date",
             "episode_end_date",
         ]
-        
+
         invalid_features = [col for col in features if col in exclude_cols]
         if invalid_features:
             raise ValueError(
@@ -53,9 +54,9 @@ def select_features(df: pd.DataFrame,
                     features: {invalid_features}. \
                     These columns should not be used for modeling."
             )
-        
+
         return df[features].copy()
-    
+
     # exclude certain columns
     exclude_cols = [
         "ltue",

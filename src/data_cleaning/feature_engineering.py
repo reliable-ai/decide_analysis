@@ -23,9 +23,10 @@ import pandas as pd
 import numpy as np
 
 
-def identify_unemployment_episodes(df: pd.DataFrame,
-                                   spell_gap_threshold: int=42,
-                                   ) -> pd.DataFrame:
+def identify_unemployment_episodes(
+    df: pd.DataFrame,
+    spell_gap_threshold: int = 42,
+) -> pd.DataFrame:
     """
     Identifies unemployment episodes and classifies them as short-term or
     long-term. This function is based on Stata code provided by Hannah Mautner.
@@ -101,7 +102,9 @@ def identify_unemployment_episodes(df: pd.DataFrame,
     # tag spells that are part of continuous job seeking episode
     # add feature `continuous`: spells that are part of continuous job seeking episode
     # (gap <= 42 days means continuous)
-    ue_df["continuous"] = (ue_df["t_since_asu"] <= pd.Timedelta(days=spell_gap_threshold)).astype(int)
+    ue_df["continuous"] = (
+        ue_df["t_since_asu"] <= pd.Timedelta(days=spell_gap_threshold)
+    ).astype(int)
 
     # step 2: identify separate unemployment episodes
     # 2.1 - begin of unemployment: every spell that is not continuous
@@ -273,11 +276,12 @@ def identify_unemployment_episodes(df: pd.DataFrame,
     return df
 
 
-def generate_biographical_variables(df: pd.DataFrame,
-                                    new_job_notif_threshold: int=92,
-                                    new_job_no_notif_threshold: int=366,
-                                    separate_benefit_threshold: int=10,
-                                    ) -> pd.DataFrame:
+def generate_biographical_variables(
+    df: pd.DataFrame,
+    new_job_notif_threshold: int = 92,
+    new_job_no_notif_threshold: int = 366,
+    separate_benefit_threshold: int = 10,
+) -> pd.DataFrame:
     """
     Generates biographical variables from longitudinal SIAB data. This function
     is based on Stata code provided by Johanna Eberle, Alexandra Schmucker,
@@ -632,7 +636,10 @@ def generate_biographical_variables(df: pd.DataFrame,
 
         ### JUDGMENT CALL: thresholds for counting as new job (92 days, 366 days)
         # count as new job if gap > 92 days with end notification, or gap > 366 days
-        job_df.loc[(job_df["end"].shift(1) == 1) & (job_df["gap"] > new_job_notif_threshold), "job"] = np.nan
+        job_df.loc[
+            (job_df["end"].shift(1) == 1) & (job_df["gap"] > new_job_notif_threshold),
+            "job",
+        ] = np.nan
         job_df.loc[job_df["gap"] > new_job_no_notif_threshold, "job"] = np.nan
 
         # generate start date of job
@@ -1386,13 +1393,13 @@ def generate_employment_history(df: pd.DataFrame, entry_number: int) -> pd.DataF
                     df.loc[df["lastjob_none"] == 1, col] = 99999
                     df[col] = df[col].fillna(99999)
 
-    
     return df
 
 
-def index_unemployment_entries(df: pd.DataFrame,
-                               year_range: list[int]=list(range(2010, 2018)),
-                               ) -> pd.DataFrame:
+def index_unemployment_entries(
+    df: pd.DataFrame,
+    year_range: list[int] = list(range(2010, 2018)),
+) -> pd.DataFrame:
     """
     Indexes all entries into unemployment for each individual. This function
     is based on Stata code provided by Hannah Mautner.

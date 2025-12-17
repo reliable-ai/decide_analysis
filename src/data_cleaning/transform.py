@@ -349,5 +349,4 @@ def reshape_data_for_ml(df: pd.DataFrame) -> pd.DataFrame:
 
     df_final = df_final[final_vars].copy()
 
-
     return df_final
