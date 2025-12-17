@@ -9,7 +9,8 @@ from typing import Literal
 import pandas as pd
 
 
-def select_features(df: pd.DataFrame, strategy: Literal["default"] = "default") -> pd.DataFrame:
+def select_features(df: pd.DataFrame,
+                    features: list[str] | None = None) -> pd.DataFrame:
     """
     Selects feature columns from the dataframe for modeling.
 
@@ -18,18 +19,51 @@ def select_features(df: pd.DataFrame, strategy: Literal["default"] = "default") 
 
     Args:
         df (pd.DataFrame): Input dataframe with all variables
+        features (list[str] | None): Optional list of feature column names to
+            select. If provided, only these features will be returned. If None,
+            uses default exclusion logic to select features.
 
     Returns:
         pd.DataFrame: Dataframe containing only feature columns
     """
-    # Columns to exclude from features
+    
+    if features is not None:
+        # if specific features are requested, use only those
+        missing_features = [col for col in features if col not in df.columns]
+        if missing_features:
+            raise ValueError(
+                f"Requested features not found in dataframe: {missing_features}"
+            )
+    
+        # validate that target/excluded columns aren't accidentally included
+        exclude_cols = [
+            "ltue",
+            "person_id",
+            "nrEntry",
+            "year",
+            # normally excluded earlier in the data cleaning process?
+            "ue_duration",
+            "episode_start_date",
+            "episode_end_date",
+        ]
+        
+        invalid_features = [col for col in features if col in exclude_cols]
+        if invalid_features:
+            raise ValueError(
+                f"Cannot include the following columns as \
+                    features: {invalid_features}. \
+                    These columns should not be used for modeling."
+            )
+        
+        return df[features].copy()
+    
+    # exclude certain columns
     exclude_cols = [
         "ltue",
         "person_id",
         "nrEntry",
         "year",
-
-        # Normally excluded earlier?
+        # normally excluded earlier in the data cleaning process?
         "ue_duration",
         "episode_start_date",
         "episode_end_date",
