@@ -26,37 +26,6 @@ def select_features(
     Returns:
         pd.DataFrame: Dataframe containing only feature columns
     """
-
-    if features is not None:
-        # if specific features are requested, use only those
-        missing_features = [col for col in features if col not in df.columns]
-        if missing_features:
-            raise ValueError(
-                f"Requested features not found in dataframe: {missing_features}"
-            )
-
-        # validate that target/excluded columns aren't accidentally included
-        exclude_cols = [
-            "ltue",
-            "person_id",
-            "nrEntry",
-            "year",
-            # normally excluded earlier in the data cleaning process?
-            "ue_duration",
-            "episode_start_date",
-            "episode_end_date",
-        ]
-
-        invalid_features = [col for col in features if col in exclude_cols]
-        if invalid_features:
-            raise ValueError(
-                f"Cannot include the following columns as \
-                    features: {invalid_features}. \
-                    These columns should not be used for modeling."
-            )
-
-        return df[features].copy()
-
     # exclude certain columns
     exclude_cols = [
         "ltue",
@@ -68,6 +37,26 @@ def select_features(
         "episode_start_date",
         "episode_end_date",
     ]
+
+    if features is not None:
+        # if specific features are requested, use only those
+        missing_features = [col for col in features if col not in df.columns]
+        if missing_features:
+            raise ValueError(
+                f"Requested features not found in dataframe: {missing_features}"
+            )
+
+        # validate that target/excluded columns aren't accidentally included
+        invalid_features = [col for col in features if col in exclude_cols]
+        if invalid_features:
+            raise ValueError(
+                f"Cannot include the following columns as \
+                    features: {invalid_features}. \
+                    These columns should not be used for modeling."
+            )
+
+        return df[features].copy()
+
 
     for col in exclude_cols:
         if col not in df.columns:
