@@ -1,5 +1,19 @@
 # pcs_multiverse
 
+## Running the Analysis
+
+The full multiverse analysis can be executed via `multiversum`:
+
+```bash
+uv run multiversum
+```
+
+For development it can be handy to run the analysis in "test" mode, which uses a smaller subset of universes to only examine each individual option at least once.
+
+```bash
+uv run multiversum --mode=test
+```
+
 ## Development
 
 Dependencies are managed via `uv`. For information on how to install `uv`, please refer to [official installation instructions](https://docs.astral.sh/uv/getting-started/installation/).
