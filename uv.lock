@@ -831,7 +831,7 @@ wheels = [
 
 [[package]]
 name = "multiversum"
-version = "0.7.1"
+version = "0.7.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "click" },
@@ -841,9 +841,9 @@ dependencies = [
     { name = "papermill" },
     { name = "rich" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/d4/10/a197fb332a108e529e5bd0a359087d9494c92644c9df8d933828e0d11c8c/multiversum-0.7.1.tar.gz", hash = "sha256:a73127f4f8681f423a3048f208912df6155212e189cf1c2ddaa908a100fce41b", size = 38056, upload-time = "2025-12-10T13:34:06.595Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/3f/ac/38ead29191332cfe56e2e372a025c474b06a28d7aaf36b1007e828153c22/multiversum-0.7.2.tar.gz", hash = "sha256:f4f2de45a490d626648a7164508a17463141ce86ae30a251a0b96aaffed300e5", size = 38585, upload-time = "2025-12-19T14:08:53.128Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/9b/c7/6044c401ff12a21b5220aae1c8dd69f9d1351bc2dc48135563b68bdfd840/multiversum-0.7.1-py3-none-any.whl", hash = "sha256:523e74c040295577ddc5b6dd3d49a5776dda76ad4d3dcb42efe25ec7481889ff", size = 29588, upload-time = "2025-12-10T13:34:05.428Z" },
+    { url = "https://files.pythonhosted.org/packages/8e/29/a044f55dd0aa9054824465955f0f5a323a3a999c717c0e6e12a549383a60/multiversum-0.7.2-py3-none-any.whl", hash = "sha256:33a31e908e29f73e1ab7a2cf9b25f4e68fb5649a9763644c8871c407e374b91e", size = 29843, upload-time = "2025-12-19T14:08:41.379Z" },
 ]
 
 [[package]]
@@ -1066,7 +1066,7 @@ scraping = [
 [package.metadata]
 requires-dist = [
     { name = "jupyter", specifier = ">=1.1.1" },
-    { name = "multiversum", specifier = ">=0.7.1" },
+    { name = "multiversum", specifier = ">=0.7.2" },
     { name = "pandas", specifier = ">=2.3.3" },
     { name = "scikit-learn", specifier = ">=1.7.2" },
 ]
