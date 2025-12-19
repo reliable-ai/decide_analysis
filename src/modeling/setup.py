@@ -9,7 +9,7 @@ import pandas as pd
 
 
 def select_features(
-    df: pd.DataFrame, features: list[str] | None = None
+    df: pd.DataFrame, features: list[str] | None = None, additional_exclude: list[str] | None = None
 ) -> pd.DataFrame:
     """
     Selects feature columns from the dataframe for modeling.
@@ -22,6 +22,8 @@ def select_features(
         features (list[str] | None): Optional list of feature column names to
             select. If provided, only these features will be returned. If None,
             uses default exclusion logic to select features.
+        additional_exclude (list[str] | None): Optional list of additional column
+            names to exclude from features.
 
     Returns:
         pd.DataFrame: Dataframe containing only feature columns
@@ -37,6 +39,9 @@ def select_features(
         "episode_start_date",
         "episode_end_date",
     ]
+
+    if additional_exclude is not None:
+        exclude_cols.extend(additional_exclude)
 
     if features is not None:
         # if specific features are requested, use only those
