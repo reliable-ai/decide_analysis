@@ -345,7 +345,7 @@ def reshape_data_for_ml(df: pd.DataFrame) -> pd.DataFrame:
     existing_ordered = [v for v in ordered_vars if v in df_final.columns]
     remaining_cols = [v for v in df_final.columns if v not in existing_ordered]
     # drop duplicates in reordered columns
-    final_vars = list(set(existing_ordered + remaining_cols))
+    final_vars = list(dict.fromkeys(existing_ordered + remaining_cols))
 
     df_final = df_final[final_vars].copy()
 
