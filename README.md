@@ -43,7 +43,7 @@ uv run pytest
 Among other types, the project uses snapshot tests via `syrupy` 📸. To update snapshots, run:
 
 ```bash
-uv run pytest --update-snapshots
+uv run pytest --snapshot-update
 ```
 
 ## Loading Data
