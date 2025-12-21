@@ -1,6 +1,8 @@
 import pandas as pd
 import numpy as np
 
+from typing import Any, Dict
+
 
 def replace_missing_value_placeholder(
     df: pd.DataFrame, placeholder: int = 99999
@@ -26,7 +28,7 @@ def replace_missing_value_placeholder(
 # with lots of missingness, then drop some rows that still have missingness in
 # certain columns, and then impute the remaining missingness with whatever makes
 # sense for that particular feature.
-def handle_missing_values(df: pd.DataFrame, strategy: list[str]) -> pd.DataFrame:
+def handle_missing_values(df: pd.DataFrame, strategy: list[Dict[str, Any]]) -> pd.DataFrame:
     """
     Handle missing values in the DataFrame by applying specific rules.
 
