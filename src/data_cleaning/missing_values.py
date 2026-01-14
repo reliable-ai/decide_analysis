@@ -99,7 +99,9 @@ def _impute_column(df: pd.DataFrame, col: str, method: Any, value: Any = "MISSIN
         )
 
 
-def handle_missing_values(df: pd.DataFrame, strategy: list[Dict[str, Any]]) -> pd.DataFrame:
+def handle_missing_values(
+    df: pd.DataFrame, strategy: list[Dict[str, Any]], verbose: bool = False
+) -> pd.DataFrame:
     """
     Handle missing values in the DataFrame by applying specific rules.
 
@@ -109,6 +111,8 @@ def handle_missing_values(df: pd.DataFrame, strategy: list[Dict[str, Any]]) -> p
             action. The actions are applied sequentially in the order they are
             specified. Each dictionary must have an "action" key and additional
             parameters depending on the action type.
+        verbose: If True, log information about how many columns, rows, or cells
+            are affected by each action (default: False)
 
             Supported actions:
 
@@ -168,9 +172,13 @@ def handle_missing_values(df: pd.DataFrame, strategy: list[Dict[str, Any]]) -> p
                     )
                 missing_pct = df.isnull().sum() / len(df)
                 cols_to_drop = missing_pct[missing_pct > threshold].index.tolist()
+                if verbose and cols_to_drop:
+                    print(f"Dropping {len(cols_to_drop)} columns: {cols_to_drop}")
                 df = df.drop(columns=cols_to_drop)
             elif "columns" in action_dict or "column_type" in action_dict:
                 cols_to_drop = _resolve_targets(df, action_dict)
+                if verbose and cols_to_drop:
+                    print(f"Dropping {len(cols_to_drop)} columns: {cols_to_drop}")
                 df = df.drop(columns=cols_to_drop)
             else:
                 raise ValueError(
@@ -183,7 +191,12 @@ def handle_missing_values(df: pd.DataFrame, strategy: list[Dict[str, Any]]) -> p
                 raise ValueError("'drop_rows' action requires either 'columns' or 'column_type'")
 
             cols = _resolve_targets(df, action_dict)
+            rows_before = len(df)
             df = df.dropna(axis=0, subset=cols)
+            rows_after = len(df)
+            if verbose:
+                rows_dropped = rows_before - rows_after
+                print(f"Dropping {rows_dropped} rows with missing values in {len(cols)} column(s)")
 
         elif action == "impute":
             # impute missing values with specified method
@@ -196,8 +209,13 @@ def handle_missing_values(df: pd.DataFrame, strategy: list[Dict[str, Any]]) -> p
             method = action_dict["method"]
             value = action_dict.get("value", "MISSING")  # Get value parameter, default to "MISSING"
             cols = _resolve_targets(df, action_dict)
+            total_cells_imputed = 0
             for col in cols:
+                cells_before = df[col].isna().sum()
                 _impute_column(df, col, method, value)
+                total_cells_imputed += cells_before
+            if verbose and total_cells_imputed > 0:
+                print(f"Imputing {total_cells_imputed} cells across {len(cols)} column(s) using method '{method}'")
         else:
             raise ValueError(
                 f"Unknown action: '{action}'. Supported actions: 'drop_columns', 'drop_rows', 'impute'"
