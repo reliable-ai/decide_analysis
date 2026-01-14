@@ -63,14 +63,15 @@ def _resolve_targets(df: pd.DataFrame, action_dict: Dict[str, Any]) -> list[str]
         raise ValueError("Action must contain either 'columns' or 'column_type'")
 
 
-def _impute_column(df: pd.DataFrame, col: str, method: Any) -> None:
+def _impute_column(df: pd.DataFrame, col: str, method: Any, value: Any = "MISSING") -> None:
     """
     Impute missing values in a single column in-place.
 
     Args:
         df: Input DataFrame (modified in-place)
         col: Column name to impute
-        method: Imputation method ("mean", "median", "mode", "zero", or numeric value)
+        method: Imputation method ("mean", "median", "mode", "fixed", or numeric value)
+        value: Value to use when method is "fixed" (default: "MISSING")
     """
     if col not in df.columns:
         raise ValueError(f"Column '{col}' not found in DataFrame")
@@ -87,14 +88,14 @@ def _impute_column(df: pd.DataFrame, col: str, method: Any) -> None:
             raise ValueError(
                 f"Cannot compute mode for column '{col}' because all values are missing"
             )
-    elif method == "zero":
-        df[col] = df[col].fillna(0)
+    elif method == "fixed":
+        df[col] = df[col].fillna(value)
     elif isinstance(method, (int, float)):
         df[col] = df[col].fillna(method)
     else:
         raise ValueError(
             f"Unknown imputation method '{method}' for column '{col}'. "
-            "Supported methods: 'mean', 'median', 'mode', 'zero', or a numeric value"
+            "Supported methods: 'mean', 'median', 'mode', 'fixed', or a numeric value"
         )
 
 
@@ -130,8 +131,13 @@ def handle_missing_values(df: pd.DataFrame, strategy: list[Dict[str, Any]]) -> p
                  {"action": "impute", "method": "mean", "columns": ["col1", "col2"]}
                - By column type:
                  {"action": "impute", "method": "mean", "column_type": "numeric"}
+               - For categorical columns with fixed value:
+                 {"action": "impute", "method": "fixed", "column_type": "categorical"}
+                 (defaults to "MISSING")
+               - For categorical columns with custom value:
+                 {"action": "impute", "method": "fixed", "value": "Unknown", "column_type": "categorical"}
 
-            Supported imputation methods: "mean", "median", "mode", "zero", or numeric value
+            Supported imputation methods: "mean", "median", "mode", "fixed" (fills with "value", default "MISSING")
             Supported column types: "numeric", "categorical", "datetime", "boolean"
 
     Returns:
@@ -188,9 +194,10 @@ def handle_missing_values(df: pd.DataFrame, strategy: list[Dict[str, Any]]) -> p
                 raise ValueError("'impute' action requires 'method'")
 
             method = action_dict["method"]
+            value = action_dict.get("value", "MISSING")  # Get value parameter, default to "MISSING"
             cols = _resolve_targets(df, action_dict)
             for col in cols:
-                _impute_column(df, col, method)
+                _impute_column(df, col, method, value)
         else:
             raise ValueError(
                 f"Unknown action: '{action}'. Supported actions: 'drop_columns', 'drop_rows', 'impute'"

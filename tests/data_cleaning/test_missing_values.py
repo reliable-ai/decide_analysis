@@ -133,14 +133,32 @@ class TestHandleMissingValues:
 
         assert result.loc[1, "a"] == 1  # Mode is 1
 
-    def test_impute_zero(self):
-        """Test imputation with zero strategy."""
+    def test_impute_fixed_with_zero(self):
+        """Test imputation with fixed strategy using zero value."""
         df = pd.DataFrame({"a": [1.0, np.nan, 3.0]})
 
-        strategy = [{"action": "impute", "method": "zero", "columns": ["a"]}]
+        strategy = [{"action": "impute", "method": "fixed", "value": 0, "columns": ["a"]}]
         result = handle_missing_values(df, strategy)
 
         assert result.loc[1, "a"] == 0
+
+    def test_impute_fixed_default_value(self):
+        """Test imputation with fixed strategy using default MISSING value."""
+        df = pd.DataFrame({"a": ["cat", np.nan, "dog"]})
+
+        strategy = [{"action": "impute", "method": "fixed", "columns": ["a"]}]
+        result = handle_missing_values(df, strategy)
+
+        assert result.loc[1, "a"] == "MISSING"
+
+    def test_impute_fixed_custom_string_value(self):
+        """Test imputation with fixed strategy using custom string value."""
+        df = pd.DataFrame({"a": ["cat", np.nan, "dog"]})
+
+        strategy = [{"action": "impute", "method": "fixed", "value": "Unknown", "columns": ["a"]}]
+        result = handle_missing_values(df, strategy)
+
+        assert result.loc[1, "a"] == "Unknown"
 
     def test_impute_custom_value(self):
         """Test imputation with custom numeric value."""
@@ -398,7 +416,7 @@ class TestHandleMissingValues:
         strategy = [
             {"action": "impute", "method": "mean", "columns": ["a"]},
             {"action": "impute", "method": "median", "columns": ["b"]},
-            {"action": "impute", "method": "zero", "columns": ["c"]},
+            {"action": "impute", "method": "fixed", "value": 0, "columns": ["c"]},
         ]
         result = handle_missing_values(df, strategy)
 
