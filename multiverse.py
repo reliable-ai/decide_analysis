@@ -19,7 +19,7 @@ config = Config(
 
         # Strategies for imputing missing data
         "missing_strategy": [
-            "drop_60_impute_median",
+            # "drop_60_impute_median",
             "drop_80_impute_median",
             "all_impute_median",
             "zero_imputation"
