@@ -37,7 +37,7 @@ config = Config(
         # threshold for gap size needed to split a spell into two spells
         "spell_gap_threshold": [15, 42, 60], # days
         # threshold for gap size needed for two benefit receipts to be separated
-        "separate_benefit_threshold": [5, 10, 15],  # days
+        # "separate_benefit_threshold": [5, 10, 15],  # days
         # strategies for imputing missing data
         "missing_strategy": [
             "drop_col50_drop_row",
@@ -53,6 +53,6 @@ config = Config(
         # model class
         "model": ["logistic", "logistic-ridge", "random_forest"],
         # feature selection strategy
-        "features": ["all", "no_gender", "no_german"],
+        # "features": ["all", "no_gender", "no_german"],
     },
 )

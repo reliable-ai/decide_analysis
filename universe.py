@@ -213,7 +213,7 @@ final_data = pd.DataFrame(
         "test_f1": test_results["f1_score"],
         "test_roc_auc": test_results["roc_auc"],
         # add model coefficients / var. importance
-        **coef_dict,
+        # **coef_dict,
     },
     index=[universe.universe_id],
 )
