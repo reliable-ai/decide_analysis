@@ -29,7 +29,7 @@ def _resolve_targets(df: pd.DataFrame, action_dict: Dict[str, Any]) -> list[str]
         df: Input DataFrame
         action_dict: Action dictionary containing either:
             - {"columns": ["col1", "col2"]}: List of column names
-            - {"column_type": "numeric"}: Column type ("numeric", "categorical", "datetime", "boolean")
+            - {"column_type": "numeric"}: Column type ("numeric", "categorical", "datetime", "boolean", "all")
 
     Returns:
         List of column names matching the specification
@@ -46,7 +46,9 @@ def _resolve_targets(df: pd.DataFrame, action_dict: Dict[str, Any]) -> list[str]
             raise ValueError("'columns' must be a list of column names")
     elif "column_type" in action_dict:
         col_type = action_dict["column_type"]
-        if col_type == "numeric":
+        if col_type == "all":
+            return df.columns.tolist()
+        elif col_type == "numeric":
             return df.select_dtypes(include=[np.number]).columns.tolist()
         elif col_type == "categorical":
             return df.select_dtypes(include=["object", "category"]).columns.tolist()
@@ -57,7 +59,7 @@ def _resolve_targets(df: pd.DataFrame, action_dict: Dict[str, Any]) -> list[str]
         else:
             raise ValueError(
                 f"Unknown column_type: '{col_type}'. Supported types: "
-                "'numeric', 'categorical', 'datetime', 'boolean'"
+                "'numeric', 'categorical', 'datetime', 'boolean', 'all'"
             )
     else:
         raise ValueError("Action must contain either 'columns' or 'column_type'")
@@ -142,7 +144,7 @@ def handle_missing_values(
                  {"action": "impute", "method": "fixed", "value": "Unknown", "column_type": "categorical"}
 
             Supported imputation methods: "mean", "median", "mode", "fixed" (fills with "value", default "MISSING")
-            Supported column types: "numeric", "categorical", "datetime", "boolean"
+            Supported column types: "numeric", "categorical", "datetime", "boolean", "all"
 
     Returns:
         DataFrame with missing values handled according to the strategy

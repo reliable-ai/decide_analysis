@@ -1,7 +1,7 @@
 import sys
 import pandas as pd
 from multiversum import Universe
-from sklearn.linear_model import LogisticRegression
+from sklearn.linear_model import LogisticRegression, LogisticRegressionCV
 from sklearn.ensemble import RandomForestClassifier
 from pathlib import Path
 # add project root to sys.path so 'src' can be imported
@@ -26,10 +26,11 @@ from src.modeling.setup import select_features, select_target  # noqa: E402
 from src.modeling.data_split import split_data  # noqa: E402
 from src.modeling.evaluation import evaluate_predictions  # noqa: E402
 
-
+# this mapping defines the configuration of this universe.
+# it is automatically overridden when running the multiverse analysis.
 settings = {
-    # Configuration of this universe
-    # (automatically overriden when running the multiverse analysis)
+    
+    # same as in multiverse.py, except only a single choice per dimension
     "dimensions": {
         # ==== Data Cleaning ====
         "spell_gap_threshold": 42,
@@ -51,117 +52,70 @@ settings = {
     }
 }
 
-
+# initialize the universe with the given settings
 universe = Universe(
-    settings=settings,
-    # Set a global seed for reproducibility
-    seed=42,
+    settings=settings, # seed handled by multiversum
 )
 
-# Get the parsed universe dimensions
+# get the parsed universe dimensions
 dimensions = universe.dimensions
 
-
-pd.set_option("display.max_columns", None)
-
-
+# ===== DATA ANALYSIS PIPELINE =====
 df = read_data(50000)
-df.head(10)
-
-
 df = translate_to_english(df)
-df.head(10)
-
-
 df = fix_data_types(df)
-df.head(10)
-
-
 df = identify_unemployment_episodes(
     df,
     spell_gap_threshold=dimensions["spell_gap_threshold"],
 )
-df.head(10)
-
-
 df = generate_biographical_variables(
     df,
-    new_job_no_notif_threshold=dimensions["new_job_no_notif_threshold"],
-    new_job_notif_threshold=dimensions["new_job_notif_threshold"],
     separate_benefit_threshold=dimensions["separate_benefit_threshold"],
 )
-df.head(10)
-
-
-year_range = list(range(dimensions["year_range_start"], dimensions["year_range_end"] + 1))
-year_range
-
-
-df = index_unemployment_entries(
-    df,
-    year_range=year_range,
-)
-df.head(10)
-
-
+df = index_unemployment_entries(df)
 df = generate_employment_history(df, 1)
-df.head(10)
-
-
 df = reshape_data_for_ml(df)
-df.head(10)
-
-
-# First, replace placeholder values (99999) with proper NaN
+# first, replace placeholder values (99999) with proper NaN
 df = replace_missing_value_placeholder(df, placeholder=99999)
-
-# Apply missing value strategy based on dimension configuration
+# apply missing value strategy based on dimension configuration
 missing_strategy = dimensions["missing_strategy"]
-
-if missing_strategy == "drop_60_impute_median":
-    # Drop columns with >60% missing, then impute remaining with median
+if missing_strategy == "drop_col50_drop_row":
+    # drop columns with >50% missing, then drop rows with any missing
     strategy = [
-        {"action": "drop_columns", "threshold": 0.6},
+        {"action": "drop_columns", "threshold": 0.5},
+        {"action": "drop_rows", "column_type": "all"},
+    ]
+elif missing_strategy == "drop_col50_impute_median":
+    # drop columns with >50% missing, then impute
+    strategy = [
+        {"action": "drop_columns", "threshold": 0.5},
         {"action": "impute", "method": "median", "column_type": "numeric"},
         {"action": "impute", "method": "fixed", "column_type": "categorical"},
     ]
-
-elif missing_strategy == "drop_80_impute_median":
-    # Drop extremely sparse columns (>80%)
-    strategy = [
-        {"action": "drop_columns", "threshold": 0.8},
-        {"action": "impute", "method": "median", "column_type": "numeric"},
-        {"action": "impute", "method": "fixed", "column_type": "categorical"},
-    ]
-
 elif missing_strategy == "all_impute_median":
-    # Keep all columns, impute all numeric
+    # keep all columns, impute all numeric
     strategy = [
         {"action": "impute", "method": "median", "column_type": "numeric"},
         {"action": "impute", "method": "fixed", "column_type": "categorical"},
-        {"action": "drop_columns", "threshold": 0.01},  # Drop any remaining columns
+        {"action": "impute", "method": "fixed", "column_type": "boolean", "value": False},
+        {"action": "drop_columns", "threshold": 0.001},  # drop any remaining NAs
     ]
-
 elif missing_strategy == "zero_imputation":
-    # Replace all missing with zero
+    # replace all missing with zero
     strategy = [
-        {"action": "impute", "method": "fixed", "column_type": "numeric", "value": 0},
+        {"action": "impute", "method": "fixed",
+         "column_type": "numeric", "value": 0},
         {"action": "impute", "method": "fixed", "column_type": "categorical"},
+        {"action": "impute", "method": "fixed", "column_type": "boolean", "value": False},
     ]
-
 else:
     raise ValueError(f"Unknown missing strategy: {missing_strategy}")
 
-# Apply the selected strategy
+# apply the selected strategy
 df = handle_missing_values(df, strategy, verbose=True)
 
-print(f"Shape after missing value handling: {df.shape}")
-print(f"Remaining missing values: {df.isnull().sum().sum()}")
-df.head()
-
-# Assert no missing values remain
+# assert no missing values remain
 assert df.isnull().sum().sum() == 0
-
 
 features = None # i.e. all non-excluded
 additional_exclude = None
@@ -178,92 +132,52 @@ elif dimensions["features"] == "no_gender-german":
     # TODO: CHECK COLNAMES
     additional_exclude = ["frau1", "maxdeutsch"]
 else:
-    raise ValueError(f"Unknown feature selection strategy: {dimensions['features']}")
+    raise ValueError(f"Unknown feature strategy: {dimensions['features']}.")
 
-
+# perform ML part
 X = select_features(
     df,
     features=features,
     additional_exclude=additional_exclude
 )
-X.head(10)
-
-
-X.shape
-
-
-X.columns.to_list()
-
-
 y = select_target(df)
-y.head(10)
-
-
-print(f"Feature Shape: {X.shape}")
-print(f"Target Shape: {y.shape}")
-print(f"Target distribution (full): {y.value_counts(normalize=True)}")
-
-
-split_stratify: bool
-split_chronological: bool
-
-if dimensions["split_strategy"] == "random":
-    split_stratify = False
-    split_chronological = False
-elif dimensions["split_strategy"] == "stratified":
-    split_stratify = True
-    split_chronological = False
-elif dimensions["split_strategy"] == "chronological":
-    split_stratify = False
-    split_chronological = True
-elif dimensions["split_strategy"] == "stratified-chronological":
-    split_stratify = True
-    split_chronological = True
-else:
-    raise ValueError(f"Unknown split strategy: {dimensions['split_strategy']}")
-
 X_train, X_test, y_train, y_test = split_data(
     X,
     y,
-    stratify=split_stratify,
-    chronological=split_chronological,
     random_state=dimensions["split_seed"]
 )
 
-
-print(f"Training set size: {X_train.shape}")
-print(f"Test set size: {X_test.shape}")
-print(f"Target distribution (train): {y_train.value_counts(normalize=True)}")
-
-
-model: LogisticRegression | RandomForestClassifier
+model: LogisticRegression | LogisticRegressionCV | RandomForestClassifier
 
 if dimensions["model"] == "logistic":
     model = LogisticRegression(
         max_iter=1000,
-        random_state=dimensions["model_seed"],
+        random_state=42,
         class_weight="balanced",
         solver="lbfgs",
     )
+elif dimensions["model"] == "logistic-ridge":
+    model = LogisticRegressionCV(
+        cv=5,
+        penalty="l2",
+        solver="lbfgs",
+        max_iter=1000,
+        random_state=42,
+        class_weight="balanced",
+        tol=1e-3,
+    )
 elif dimensions["model"] == "random_forest":
     model = RandomForestClassifier(
-        random_state=dimensions["model_seed"],
+        random_state=42,
         class_weight="balanced",
     )
 else:
     raise ValueError(f"Unknown model type: {dimensions['model']}")
 
-
-print("Training model...")
 model.fit(X_train, y_train)
-print("Model trained successfully!")
 
-print(f"\nTraining Accuracy: {model.score(X_train, y_train):.4f}")
-print(f"Test Accuracy: {model.score(X_test, y_test):.4f}")
-
-
-# Extract coefficients or feature importances
-if dimensions["model"] == "logistic":
+# extract coefficients or feature importances
+if dimensions["model"] in ["logistic", "logistic-ridge"]:
     # For logistic regression, get coefficients
     coefficients = model.coef_[0]  # Shape: (n_features,)
     coef_dict = {f"coef_{col}": coef for col, coef in zip(model.feature_names_in_, coefficients)}
@@ -277,50 +191,39 @@ else:
 print(f"Extracted {len(coef_dict)} coefficient/importance values")
 
 
-# Make predictions
+# make predictions
 y_pred_train = model.predict(X_train)
 y_pred_test = model.predict(X_test)
 
-# Get prediction probabilities
+# get prediction probabilities
 y_pred_proba_train = model.predict_proba(X_train)[:, 1]
 y_pred_proba_test = model.predict_proba(X_test)[:, 1]
 
-
-# Evaluate on training set
-print("TRAINING SET")
+# evaluate on training set
 train_results = evaluate_predictions(y_train, y_pred_train, y_pred_proba_train)
 
-
-# Evaluate on test set
-print("TEST SET")
+# evaluate on test set
 test_results = evaluate_predictions(y_test, y_pred_test, y_pred_proba_test)
-
 
 final_data = pd.DataFrame(
     {
-        "perf_acc": test_results["accuracy"],
-        "perf_precision": test_results["precision"],
-        "perf_recall": test_results["recall"],
-        "perf_f1": test_results["f1_score"],
-        "perf_roc_auc": test_results["roc_auc"],
-
-        # Add model coefficients / var. importance
+        "test_acc": test_results["accuracy"],
+        "test_precision": test_results["precision"],
+        "test_recall": test_results["recall"],
+        "test_f1": test_results["f1_score"],
+        "test_roc_auc": test_results["roc_auc"],
+        # add model coefficients / var. importance
         **coef_dict,
     },
     index=[universe.universe_id],
 )
-final_data
-
 
 universe.save_data(final_data)
-
 
 df_pred = pd.DataFrame({
     "id": y_test.index,
     "y_pred": y_pred_test,
     "y_pred_proba": y_pred_proba_test
 })
-df_pred.head()
-
 
 universe.export_dataframe(df_pred, "y_pred_test.parquet")

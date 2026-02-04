@@ -10,3 +10,10 @@ output/
 # job output files
 *.out
 *.err
+*.log
+
+# env files
+.env
+
+# sandbox notebook
+sandbox.ipynb

@@ -1,43 +1,58 @@
+"""
+Multiverse configuration for unemployment prediction analysis.
+
+This file defines the multiverse analysis configuration, specifying each
+judgment call and its possible choices. This includes different data cleaning
+strategies, modeling approaches, and more.
+
+Current Dimensions:
+    Data Cleaning:
+        - spell_gap_threshold: Days needed to split unemployment spells
+        - separate_benefit_threshold: Days to separate benefit receipt periods
+        - missing_strategy: Approaches for handling missing data
+
+    Random Seeds:
+        - split_seed: Seed for train/test data splitting
+
+    Modeling:
+        - model: Classification algorithm choice
+        - features: Feature inclusion/exclusion strategies
+
+Usage:
+    This configuration is consumed by the `multiversum` framework to generate
+    and execute all possible combinations of analytical choices, producing a
+    comprehensive multiverse analysis.
+"""
+
+# imports
 from multiversum import Config
 
-# Configure the multiverse itself
+# set up multiverse configuration
 config = Config(
-    # Specify the decisions / dimensions and their options
+    
+    # dimensions map is used to define all judgment calls
     dimensions={
+        
         # ==== Data Cleaning ====
-        # Threshold for gap size needed to split a spell into two spells
-        "spell_gap_threshold": [42, 30, 60], # days
-        # Threshold for gap size needed to count a job as "new"
-        "new_job_notif_threshold": [92],  # days; with notification
-        "new_job_no_notif_threshold": [366],  # days; without notification
-        # Threshold for gap size needed for two benefit receipts to be separated.
-        "separate_benefit_threshold": [10, 7, 14],  # days
-
-        # Cutoffs for year range to be included in data
-        "year_range_start": [2010],  # start year
-        "year_range_end": [2013, 2014, 2015, 2016],  # end year (inclusive)
-
-        # Strategies for imputing missing data
+        # threshold for gap size needed to split a spell into two spells
+        "spell_gap_threshold": [15, 42, 60], # days
+        # threshold for gap size needed for two benefit receipts to be separated
+        "separate_benefit_threshold": [5, 10, 15],  # days
+        # strategies for imputing missing data
         "missing_strategy": [
-            # "drop_60_impute_median",
-            "drop_80_impute_median",
+            "drop_col50_drop_row",
+            "drop_col50_impute_median",
             "all_impute_median",
-            "zero_imputation"
         ],
 
         # ==== Random Seeds ====
-        # Train/test split seed
-        "split_seed": [80539, 94720],
-        # Model seed
-        "model_seed": [54, 74],
+        # train/test split seed
+        "split_seed": list(range(3)),
 
         # ==== Modeling ====
-        # Train/test split rule
-        # "split_strategy": ["random", "stratified", "chronological", "stratified-chronological"],
-        "split_strategy": ["random", "stratified"],
-        # Model class
-        "model": ["logistic", "random_forest"],
-        # Feature selection strategy
-        "features": ["all", "no_gender", "no_german", "no_gender-german"],
+        # model class
+        "model": ["logistic", "logistic-ridge", "random_forest"],
+        # feature selection strategy
+        "features": ["all", "no_gender", "no_german"],
     },
 )
