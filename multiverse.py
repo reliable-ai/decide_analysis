@@ -35,23 +35,35 @@ config = Config(
         
         # ==== Data Cleaning ====
         # threshold for gap size needed to split a spell into two spells
-        "spell_gap_threshold": [15, 42, 60], # days
+        "spell_gap_threshold": [15, 30, 42, 60, 75], # days
         # threshold for gap size needed for two benefit receipts to be separated
         # "separate_benefit_threshold": [5, 10, 15],  # days
         # strategies for imputing missing data
         "missing_strategy": [
             "drop_col50_drop_row",
             "drop_col50_impute_median",
+            "drop_col90_drop_row",
             "all_impute_median",
+            "zero_imputation",
         ],
+        # threshold for gap size needed to separate jobs with notification
+        "new_job_notif_threshold": [30, 60, 92, 120, 150],  # days
+        # threshold for gap size needed to separate jobs without notification
+        "new_job_no_notif_threshold": [150, 300, 366, 500, 650], # days
 
         # ==== Random Seeds ====
         # train/test split seed
-        "split_seed": list(range(3)),
+        "split_seed": list(range(5)),
 
         # ==== Modeling ====
         # model class
-        "model": ["logistic", "logistic-ridge", "random_forest"],
+        "model": [
+            "logistic",
+            "logistic-ridge",
+            "logistic-lasso",
+            "random_forest",
+            "xgboost",
+        ],
         # feature selection strategy
         # "features": ["all", "no_gender", "no_german"],
     },

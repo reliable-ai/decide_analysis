@@ -4,6 +4,7 @@ from multiversum import Universe
 from sklearn.linear_model import LogisticRegression, LogisticRegressionCV
 from sklearn.ensemble import RandomForestClassifier
 from pathlib import Path
+from xgboost import XGBClassifier
 # add project root to sys.path so 'src' can be imported
 project_root = Path(__file__).resolve().parent
 if str(project_root) not in sys.path:
@@ -70,7 +71,9 @@ df = identify_unemployment_episodes(
 )
 df = generate_biographical_variables(
     df,
-    separate_benefit_threshold=dimensions["separate_benefit_threshold"],
+    # separate_benefit_threshold=dimensions["separate_benefit_threshold"],
+    new_job_notif_threshold=dimensions["new_job_notif_threshold"],
+    new_job_no_notif_threshold=dimensions["new_job_no_notif_threshold"],
 )
 df = index_unemployment_entries(df)
 df = generate_employment_history(df, 1)
@@ -91,6 +94,12 @@ elif missing_strategy == "drop_col50_impute_median":
         {"action": "drop_columns", "threshold": 0.5},
         {"action": "impute", "method": "median", "column_type": "numeric"},
         {"action": "impute", "method": "fixed", "column_type": "categorical"},
+    ]
+elif missing_strategy == "drop_col90_drop_row":
+    # drop columns with >90% missing, then drop rows with any missing
+    strategy = [
+        {"action": "drop_columns", "threshold": 0.9},
+        {"action": "drop_rows", "column_type": "all"},
     ]
 elif missing_strategy == "all_impute_median":
     # keep all columns, impute all numeric
@@ -120,19 +129,19 @@ assert df.isnull().sum().sum() == 0
 features = None # i.e. all non-excluded
 additional_exclude = None
 
-if dimensions["features"] == "all":
-    pass
-elif dimensions["features"] == "no_gender":
-    # TODO: CHECK COLNAMES
-    additional_exclude = ["frau1"]
-elif dimensions["features"] == "no_german":
-    # TODO: CHECK COLNAMES
-    additional_exclude = ["maxdeutsch"]
-elif dimensions["features"] == "no_gender-german":
-    # TODO: CHECK COLNAMES
-    additional_exclude = ["frau1", "maxdeutsch"]
-else:
-    raise ValueError(f"Unknown feature strategy: {dimensions['features']}.")
+# if dimensions["features"] == "all":
+#     pass
+# elif dimensions["features"] == "no_gender":
+#     # TODO: CHECK COLNAMES
+#     additional_exclude = ["frau1"]
+# elif dimensions["features"] == "no_german":
+#     # TODO: CHECK COLNAMES
+#     additional_exclude = ["maxdeutsch"]
+# elif dimensions["features"] == "no_gender-german":
+#     # TODO: CHECK COLNAMES
+#     additional_exclude = ["frau1", "maxdeutsch"]
+# else:
+#     raise ValueError(f"Unknown feature strategy: {dimensions['features']}.")
 
 # perform ML part
 X = select_features(
@@ -147,11 +156,12 @@ X_train, X_test, y_train, y_test = split_data(
     random_state=dimensions["split_seed"]
 )
 
-model: LogisticRegression | LogisticRegressionCV | RandomForestClassifier
+model: LogisticRegression | LogisticRegressionCV | RandomForestClassifier | XGBClassifier
 
 if dimensions["model"] == "logistic":
     model = LogisticRegression(
-        max_iter=1000,
+        penalty=None,
+        max_iter=2000,
         random_state=42,
         class_weight="balanced",
         solver="lbfgs",
@@ -161,7 +171,19 @@ elif dimensions["model"] == "logistic-ridge":
         cv=5,
         penalty="l2",
         solver="lbfgs",
-        max_iter=1000,
+        max_iter=2000,
+        random_state=42,
+        class_weight="balanced",
+        tol=1e-3,
+    )
+elif dimensions["model"] == "logistic-lasso":
+    # L1-penalized logistic regression (LASSO)
+    # use saga solver which supports l1 penalty
+    model = LogisticRegressionCV(
+        cv=5,
+        penalty="l1",
+        solver="saga",
+        max_iter=2000,
         random_state=42,
         class_weight="balanced",
         tol=1e-3,
@@ -171,18 +193,24 @@ elif dimensions["model"] == "random_forest":
         random_state=42,
         class_weight="balanced",
     )
+elif dimensions["model"] == "xgboost":
+    model = XGBClassifier(
+        random_state=42,
+        use_label_encoder=False,
+        eval_metric="logloss",
+    )
 else:
     raise ValueError(f"Unknown model type: {dimensions['model']}")
 
 model.fit(X_train, y_train)
 
 # extract coefficients or feature importances
-if dimensions["model"] in ["logistic", "logistic-ridge"]:
-    # For logistic regression, get coefficients
+if dimensions["model"] in ["logistic", "logistic-ridge", "logistic-lasso"]:
+    # for regression-based models, get coefficients
     coefficients = model.coef_[0]  # Shape: (n_features,)
     coef_dict = {f"coef_{col}": coef for col, coef in zip(model.feature_names_in_, coefficients)}
-elif dimensions["model"] == "random_forest":
-    # For random forest, get feature importances
+elif dimensions["model"] in ["random_forest", "xgboost"]:
+    # for tree-based models, get feature importances
     importances = model.feature_importances_
     coef_dict = {f"varimp_{col}": imp for col, imp in zip(model.feature_names_in_, importances)}
 else:
