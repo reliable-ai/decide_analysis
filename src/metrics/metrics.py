@@ -1,5 +1,5 @@
 """
-This file defines intra-bucket (between universe) and inter-bucket (within
+This file defines inter-bucket (between universe) and intra-bucket (within
 universe) metrics for assessing the downstream impact of judgment calls in
 the multiverse. These metrics can be used to determine which judgment calls have
 the largest impact on downstream results and to what extent the results are
@@ -78,7 +78,7 @@ def path_within_bucket_variation(multiverse_results: pd.DataFrame,
     return variance
 
 def within_bucket_variation(multiverse_results: pd.MultiIndex,
-                           performance_metric: str) -> pd.DataFrame:
+                           performance_metric: str) -> dict:
     """
     Calculate the within-bucket variation for a given performance metric. This
     measures how much the performance metric varies within each bucket (i.e., 
@@ -89,14 +89,17 @@ def within_bucket_variation(multiverse_results: pd.MultiIndex,
             of the multiverse analysis.
         performance_metric (str): The name of the performance metric to analyze.
     Returns:
-        pd.DataFrame: A DataFrame containing the within-bucket variation for the
-            specified performance metric.
+        dict: A dictionary containing the within-bucket variation of each
+            judgment call for the specified performance metric.
     """
         
     # because the judgment calls are organized chronologically, we can calculate
     # the within-bucket variation by going column-by-column
     # and calculating the variance of the performance metric across the
     # different forks of the multiverse.
+    
+    # create copy of the multiverse results to avoid modifying the original
+    multiverse_results = deepcopy(multiverse_results)
     
     # STEP 1
     # enumerate the nodes in the decision tree, where each node corresponds to
@@ -188,7 +191,109 @@ def within_bucket_variation(multiverse_results: pd.MultiIndex,
                         # the decrease in variance is just the variance of the \
                             # current path.")
                 decreases_in_variance.append(var)
+        # could take a variety of functions to summarize the decreases in 
+        # variance at this depth, such as range, variance, etc.
         range_of_decreases_in_variance_by_depth[depth] = \
             np.max(decreases_in_variance) - np.min(decreases_in_variance)
     
     return range_of_decreases_in_variance_by_depth
+
+def between_bucket_variation(multiverse_results: pd.MultiIndex,
+                             performance_metric: str) -> dict:
+    """
+    Calculate the between-bucket variation for a given performance metric. This
+    measures how much the performance metric varies across different buckets
+    (i.e., different combinations of judgment calls).
+    
+    For each decision point s_i, we fix all other decisions (both upstream and
+    downstream) and vary only s_i across its possible choices. The variation in
+    the performance metric across those choices is attributable to s_i. We
+    repeat this for every possible combination of the other decisions, giving
+    a distribution of variations attributable to s_i.
+
+    Args:
+        multiverse_results (pd.DataFrame): A DataFrame containing the results
+            of the multiverse analysis.
+        performance_metric (str): The name of the performance metric to analyze.
+    Returns:
+        dict: A dictionary mapping each judgment call (dimension name) to a
+            list of variation values (one per unique combination of all other
+            decisions). Each value is the variance of the performance metric
+            when only that judgment call is varied.
+    """
+    
+    # create copy of the multiverse results to avoid modifying the original
+    multiverse_results = deepcopy(multiverse_results)
+    
+    # get the list of dimension columns (judgment calls) in order
+    dimension_cols = [col for col in multiverse_results.columns
+                      if col[1] == "dimension"]
+    dimension_names = [col[0] for col in dimension_cols]
+    
+    # IDEA
+    # for each decision node s_i in the multiverse tree, we want to get the
+    # decision paths that differ only in the choice made at s_i. if we order the
+    # nodes as (s_1, ..., s_{i-1}, s_i, s_{i+1}, ..., s_d), where we have d
+    # decisions, for each decision, we want the set
+    # {(s_1, ..., s_{i-1}, j, s_{i+1}, ..., s_d): j is a possible choice at s_i}
+    # along with the accuracy of each of these paths.
+    
+    # set up storage for later
+    between_variation = {}
+    
+    # for each decision point s_i, fix all other decisions and vary only s_i
+    for depth, target_dim in enumerate(dimension_names):
+        
+        # get s_j where i!=j (i.e., all dimensions except the target dimension)
+        other_dims = [d for d in dimension_names if d != target_dim]
+        
+        # get all unique combinations of the OTHER dimensions
+        other_dim_cols = [(d, "dimension") for d in other_dims]
+        unique_other_combos = multiverse_results[other_dim_cols] \
+            .drop_duplicates()
+            
+        # print(f"For target dimension {target_dim} at depth {depth}, the other dimensions are {other_dims} and the unique combinations of the other dimensions are:")
+        # print(unique_other_combos)
+        
+        # for each unique combination of the other decisions, compute the
+        # variance of the performance metric across the different choices of s_i
+        variations = []
+        for row_idx, other_decisions in unique_other_combos.iterrows():
+            # print("row_idx")
+            # print(row_idx)
+            # print("other_decisions")
+            # print(other_decisions)
+            # filter to rows matching this combination of other decisions
+            mask = pd.Series(True, index=multiverse_results.index)
+            for other_dim in other_dims:
+                mask &= (multiverse_results[(other_dim, "dimension")]
+                         == other_decisions[(other_dim, "dimension")])
+            # this subset of the multiverse differs only in the choice made at
+            # s_i, so any variation in the performance metric across this
+            # subset can be attributed to s_i.
+            subset = multiverse_results.loc[mask]
+            
+            # print(f"Subset of multiverse results that differ only in the choice made at \
+            #     target dimension {target_dim} for this combination of other \
+            #         decisions:")
+            # print(subset)
+            
+            # the remaining rows differ only in s_i — compute variance of
+            # the performance metric across the different choices for s_i.
+            # how do we best leverage these sets? each individual set tells us
+            # how the decision at depth i impacts the performance metric by
+            # comparison to other leaves in the set, we can see how important
+            # the decision was for driving a good conclusion/outcome. so we can
+            # take a summary statistic of the spread of the performance metric
+            # within each group, such as taking the variance (or range) of the
+            # performance metric of the leaves in the group, and later average
+            # it across groups to get an overall measure of how much the
+            # decision at depth i drives results.
+            var = subset[(performance_metric, "performance_metric")].var()
+            variations.append(var)
+        
+        # get the average variance within group, as mentioned in the notes above
+        avg_spread = np.mean(variations)
+        between_variation[target_dim] = avg_spread
+    
+    return between_variation
