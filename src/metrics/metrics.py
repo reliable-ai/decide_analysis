@@ -163,135 +163,10 @@ def within_bucket_variation(multiverse_results: pd.MultiIndex,
     # then calculate the variance of the leaves down each potential decision
     # path. the analyst will want to spend more time on decisions that have a
     # larger range/variance/spread of these variances.
-    range_of_decreases_in_variance_by_depth = {}
-    for depth, paths_with_var in var_by_depth.items():
-        decreases_in_variance = []
-        for path_tuple, var in paths_with_var.items():
-            # get the paths that are one decision away from this path (i.e.,
-            # the paths that are the same as this path except for one additional
-            # judgment call)
-            paths_one_decision_away = [p for p in \
-                var_by_depth.get(depth + 1, {}).keys() if \
-                    p[:depth] == path_tuple]
-            # print(f"At depth {depth}, for path {path_tuple} with variance \
-                # {var}, the paths one decision away are: \
-                    # {paths_one_decision_away}")
-            for path_one_decision_away in paths_one_decision_away:
-                var_one_decision_away = \
-                    var_by_depth[depth + 1][path_one_decision_away]
-                decrease_in_variance = var - var_one_decision_away
-                decreases_in_variance.append(decrease_in_variance)
-            # if we are at the last split (children are leaf nodes),
-            # then there are no paths one decision away (will be represented as
-            # empty list), and the decrease in variance is just the variance of
-            # the current path.
-            if len(paths_one_decision_away) == 0:
-                # print(f"At depth {depth}, for path {path_tuple} with \
-                    # variance {var}, there are no paths one decision away, so \
-                        # the decrease in variance is just the variance of the \
-                            # current path.")
-                decreases_in_variance.append(var)
-        # could take a variety of functions to summarize the decreases in 
-        # variance at this depth, such as range, variance, etc.
-        range_of_decreases_in_variance_by_depth[depth] = \
-            np.max(decreases_in_variance) - np.min(decreases_in_variance)
-    
-    return range_of_decreases_in_variance_by_depth
-
-def within_bucket_variation_test(multiverse_results: pd.MultiIndex,
-                           performance_metric: str) -> dict:
-    """
-    Calculate the within-bucket variation for a given performance metric. This
-    measures how much the performance metric varies within each bucket (i.e., 
-    within each combination of judgment calls).
-
-    Args:
-        multiverse_results (pd.DataFrame): A DataFrame containing the results
-            of the multiverse analysis.
-        performance_metric (str): The name of the performance metric to analyze.
-    Returns:
-        dict: A dictionary containing the within-bucket variation of each
-            judgment call for the specified performance metric.
-    """
-        
-    # because the judgment calls are organized chronologically, we can calculate
-    # the within-bucket variation by going column-by-column
-    # and calculating the variance of the performance metric across the
-    # different forks of the multiverse.
-    
-    # create copy of the multiverse results to avoid modifying the original
-    multiverse_results = deepcopy(multiverse_results)
-    
-    # STEP 1
-    # enumerate the nodes in the decision tree, where each node corresponds to
-    # the series of judgment calls that lead to that node.
-    decision_paths = [(0, {})] # list of tuples of the form (depth, path) where depth is an int and path is a dict of the form {dimension: choice}
-    # loop through number of judgment calls, which is number of columns that are dimensions in the multiindex
-    for depth in range(1, multiverse_results.columns.get_level_values(1).tolist().count("dimension")):
-        # get the unique combinations of judgment calls up to this depth
-        unique_paths = multiverse_results.iloc[:, :depth].drop_duplicates()
-        for _, row in unique_paths.iterrows():
-            path = {col[0]: row[col] for col in unique_paths.columns}
-            decision_paths.append((depth, path))
-    
-    # STEP 2
-    # now that we have the decision paths enumerated, we want to organize them
-    # into dictionaries keyed by the depth in the decision tree (i.e., the number of judgment calls made),
-    # where the value is the list of the decision paths at that depth.
-    decision_paths_by_depth = defaultdict(list)
-    for depth, path in decision_paths:
-        decision_paths_by_depth[depth].append(path)
-    
-    # print("`decision_paths_by_depth`:")
-    # print(decision_paths_by_depth)
-        
-    # STEP 3
-    # notice that we can get the variance of circle A by taking variance of all
-    # paths that meet depth 0. variance of each B circle by taking variance
-    # of each path at depth 1. etc.
-    # so to get average variance due to the decision in the multiverse,
-    # take mean(path_within_bucket_variation(path)) for each path at the depth correspnding to that decision.
-    var_by_depth = {}
-    for depth, paths in decision_paths_by_depth.items():
-        paths_with_var = {}
-        for path in paths:
-            # get a tuple representation of the path, where the index in the
-            # tuple is the order of the judgment call and the value is the
-            # choice made for that judgment call. for example, if the first
-            # judgment call is "spell_gap_threshold" and the second judgment
-            # call is "model", then a path where the spell gap threshold is 42
-            # and the model is random forest would be represented as
-            # (42, "random_forest").
-            path_tuple = []
-            for dimension in multiverse_results.columns.get_level_values(0):
-                if (dimension, "dimension") in multiverse_results.columns:
-                    if dimension in path:
-                        path_tuple.append(path[dimension])
-            path_tuple = tuple(path_tuple)
-            paths_with_var[path_tuple] = \
-                path_within_bucket_variation(multiverse_results,
-                                            path,
-                                            performance_metric)
-        var_by_depth[depth] = paths_with_var
-
-    # print("`var_by_depth`:")
-    # print(var_by_depth)
-    
-    # STEP 4
-    # now we have the variance for each path at each depth. we want to use this
-    # to calculate the decrease in variance at each split. specifically, we take
-    # the variance of the leaves along a path before a split/decision is made,
-    # then calculate the variance of the leaves down each potential decision
-    # path. the analyst will want to spend more time on decisions that have a
-    # larger range/variance/spread of these variances.
     # range_of_decreases_in_variance_by_depth = {}
     mean_decrease_in_variance_by_depth = {}
-    mean_pre_variance_by_depth = {}
-    mean_post_variance_by_depth = {}
     for depth, paths_with_var in var_by_depth.items():
         decreases_in_variance = []
-        pre_variance = []
-        post_variance = []
         for path_tuple, var in paths_with_var.items():
             # get the paths that are one decision away from this path (i.e.,
             # the paths that are the same as this path except for one additional
@@ -307,8 +182,6 @@ def within_bucket_variation_test(multiverse_results: pd.MultiIndex,
                     var_by_depth[depth + 1][path_one_decision_away]
                 decrease_in_variance = var - var_one_decision_away
                 decreases_in_variance.append(decrease_in_variance)
-                pre_variance.append(var)
-                post_variance.append(var_one_decision_away)
             # if we are at the last split (children are leaf nodes),
             # then there are no paths one decision away (will be represented as
             # empty list), and the decrease in variance is just the variance of
@@ -324,12 +197,9 @@ def within_bucket_variation_test(multiverse_results: pd.MultiIndex,
         # range_of_decreases_in_variance_by_depth[depth] = \
         #     np.max(decreases_in_variance) - np.min(decreases_in_variance)
         mean_decrease_in_variance_by_depth[depth] = np.mean(decreases_in_variance)
-        mean_pre_variance_by_depth[depth] = np.mean(pre_variance)
-        mean_post_variance_by_depth[depth] = np.mean(post_variance)
     
-    return {'mean_decrease_in_variance_by_depth': mean_decrease_in_variance_by_depth,
-            'mean_pre_variance_by_depth': mean_pre_variance_by_depth,
-            'mean_post_variance_by_depth': mean_post_variance_by_depth}
+    return mean_decrease_in_variance_by_depth
+
 
 def between_bucket_variation(multiverse_results: pd.MultiIndex,
                              performance_metric: str) -> dict:
