@@ -321,7 +321,7 @@ def total_variance_decomposition(multiverse_results: pd.MultiIndex,
     the $i$th decision, that means that there are $c_1 * ... * c_{i-1} * c_{i+1}
     * c_d$ groups of size $c_i$.
     
-    For each decision $i\in\{1, ..., d\}$, we want to calculate the following
+    For each decision $i$ in {1, ..., $d$}, we want to calculate the following
     three quantities:
     1. $Var(Y)$: the variance of the performance metric across all universes in
         the multiverse.

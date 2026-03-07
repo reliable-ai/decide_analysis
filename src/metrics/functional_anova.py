@@ -4,12 +4,15 @@ This file is copied from fairness_multiverse/analysis.py at https://github.com/r
 
 from typing import Optional
 import pandas as pd
+import numpy as np
 
 from pathlib import Path
-from ConfigSpace import ConfigurationSpace
-from ConfigSpace.hyperparameters import CategoricalHyperparameter
+from ConfigSpace import ConfigurationSpace, CategoricalHyperparameter
 from sklearn.preprocessing import OrdinalEncoder
 
+# fanova uses np.float, removed in NumPy 2.0
+if not hasattr(np, 'float'):
+    np.float = np.float64
 from fanova import fANOVA
 
 
@@ -43,9 +46,8 @@ class MultiverseFanova:
         Returns:
         - A pandas DataFrame containing the encoded features.
         """
-        return pd.DataFrame(
-            OrdinalEncoder().fit(features).transform(features), columns=features.columns
-        )
+        encoded = OrdinalEncoder().fit(features).transform(features).astype(int)
+        return pd.DataFrame(encoded, columns=features.columns)
 
     def generate_configuration_space(self) -> ConfigurationSpace:
         """
@@ -57,7 +59,7 @@ class MultiverseFanova:
         cs = ConfigurationSpace()
         for colname in self.fanova_features.columns:
             col = self.fanova_features[colname]
-            cs.add_hyperparameter(
+            cs.add(
                 CategoricalHyperparameter(name=colname, choices=list(col.unique()))
             )
         return cs
@@ -87,9 +89,7 @@ class MultiverseFanova:
         Returns:
         - A pandas DataFrame containing the importance of each feature.
         """
-        param_list = [
-            param.name for param in self.configuration_space.get_hyperparameters()
-        ]
+        param_list = list(self.configuration_space.keys())
         fanova_all_effects = self.fanova.quantify_importance(param_list)
         df_importance_interactions = (
             pd.DataFrame(fanova_all_effects).transpose().reset_index(drop=False)
@@ -113,9 +113,7 @@ class MultiverseFanova:
         Returns:
         - A pandas DataFrame containing the individual importance of each feature.
         """
-        param_list = [
-            param.name for param in self.configuration_space.get_hyperparameters()
-        ]
+        param_list = list(self.configuration_space.keys())
 
         main_effects = {}
         for param in param_list:
@@ -125,9 +123,9 @@ class MultiverseFanova:
             ]
 
         df_main_effects = pd.DataFrame(main_effects).transpose()
-        df_main_effects.sort_values(by="individual importance", ascending=False)
+        df_main_effects.sort_values(by="individual importance", ascending=False, inplace=True)
 
         if save_to is not None:
-            df_main_effects.to_csv(df_main_effects)
+            df_main_effects.to_csv(save_to)
 
         return df_main_effects
