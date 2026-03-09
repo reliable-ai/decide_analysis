@@ -7,6 +7,9 @@ read_data/read_data.py
 # multiversum outputs
 output/
 
+# invariance test outputs
+invariance_output/
+
 # job output files
 *.out
 *.err
