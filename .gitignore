@@ -26,3 +26,9 @@ sandbox.ipynb
 
 # images
 images/
+
+.Rproj.user
+.Rhistory
+analysis/*_files/
+analysis/*.pdf
+analysis/*.html

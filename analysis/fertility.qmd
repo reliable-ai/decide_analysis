@@ -1,0 +1,37 @@
+---
+title: "Analyse Case Study: Fertility"
+format: html
+---
+
+```{r setup}
+source("R/_load.R")
+```
+
+```{r}
+mv_fert <- load_multiverse("fertility")
+mv_fert
+```
+
+```{r}
+mv_fert |>
+  get_multiverse_decisions()
+```
+
+```{r}
+#| fig-width: 11
+vis_multiverse_tree(mv_fert)
+```
+
+```{r}
+calc_regression(mv_fert, colname_metric = "fertility_low_estimate")
+```
+
+```{r}
+calc_within_bucket_variation(mv_fert, colname_metric = "fertility_low_estimate")
+```
+
+```{r}
+calc_between_bucket_variation(mv_fert, colname_metric = "fertility_low_estimate")
+```
+
+
