@@ -3,6 +3,7 @@ library(broom)
 library(here)
 library(tidygraph)
 library(ggraph)
+library(reticulate)
 
 # Load all scripts in the R directory, which do *not* start with a `_`
 lapply(

@@ -36,6 +36,13 @@ reg_fert
 ```{r}
 vis_regression_coefficients(reg_fert)
 ```
+
+## FANOVA
+
+```{r}
+calc_fanova(mv_fert, colname_metric = "fertility_low_estimate")
+```
+
 # Our Framework
 
 ```{r}
