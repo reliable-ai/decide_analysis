@@ -12,6 +12,8 @@ mv_fert <- load_multiverse("fertility")
 mv_fert
 ```
 
+# Overview
+
 ```{r}
 mv_fert |>
   get_multiverse_decisions()
@@ -22,16 +24,36 @@ mv_fert |>
 vis_multiverse_tree(mv_fert)
 ```
 
+# Existing Methods
+
+## Regression
+
 ```{r}
-calc_regression(mv_fert, colname_metric = "fertility_low_estimate")
+reg_fert <- calc_regression(mv_fert, colname_metric = "fertility_low_estimate")
+reg_fert
 ```
 
 ```{r}
-calc_within_bucket_variation(mv_fert, colname_metric = "fertility_low_estimate")
+vis_regression_coefficients(reg_fert)
+```
+# Our Framework
+
+```{r}
+within_fert <- calc_within_bucket_variation(mv_fert, colname_metric = "fertility_low_estimate")
+within_fert
 ```
 
 ```{r}
-calc_between_bucket_variation(mv_fert, colname_metric = "fertility_low_estimate")
+vis_importance(within_fert)
+```
+
+```{r}
+between_fert <- calc_between_bucket_variation(mv_fert, colname_metric = "fertility_low_estimate")
+between_fert
+```
+
+```{r}
+vis_importance(between_fert)
 ```
 
 
