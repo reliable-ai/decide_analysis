@@ -40,8 +40,16 @@ vis_regression_coefficients(reg_fert)
 ## FANOVA
 
 ```{r}
-calc_fanova(mv_fert, colname_metric = "fertility_low_estimate")
+fanova_fert <- calc_fanova(mv_fert, colname_metric = "fertility_low_estimate")
+fanova_fert
 ```
+```{r}
+fanova_fert |>
+  head(10) |> 
+  fanova_to_vec() |> 
+  vis_importance()
+```
+
 
 # Our Framework
 
