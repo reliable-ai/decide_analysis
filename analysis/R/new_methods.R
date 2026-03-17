@@ -1,5 +1,3 @@
-# Note: Vibe-coded conversion from Python code; I don't trust these yet!
-
 calc_within_bucket_variation <- function (mv, colname_metric, dim_prefix = "mv_dim_") {
   dims <- mv |> select(starts_with(dim_prefix)) |> colnames()
   n_dims <- length(dims)
