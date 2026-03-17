@@ -98,4 +98,14 @@ between_siab
 vis_importance(between_siab)
 ```
 
+# Decisions
+
+```{r}
+mv_siab |> 
+  vis_decision(
+    mv_dim_model,
+    type = "kde",
+    colname_metric = "perf_acc"
+  )
+```
 

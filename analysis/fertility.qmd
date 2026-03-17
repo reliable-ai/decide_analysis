@@ -86,4 +86,46 @@ between_fert
 vis_importance(between_fert)
 ```
 
+# Decisions
 
+For relationship_status options 1 and 2 we observe perfect overlap.
+
+```{r}
+mv_fert |> 
+  vis_decision(
+    mv_dim_relationship_status,
+    type = "kde",
+    colname_metric = "fertility_low_estimate"
+  )
+```
+```{r}
+mv_fert |> 
+  vis_decision(
+    mv_dim_relationship_status,
+    type = "kde",
+    facet = T,
+    colname_metric = "fertility_low_estimate"
+  )
+```
+
+```{r}
+mv_fert |> 
+  vis_decision(
+    mv_dim_fertile,
+    type = "kde",
+    facet = T,
+    colname_metric = "fertility_low_estimate"
+  )
+```
+
+
+```{r}
+mv_fert |> 
+  vis_two_decisions(
+    mv_dim_fertile,
+    mv_dim_menstrual_calculation,
+    facet = T,
+    type = "kde",
+    colname_metric = "fertility_low_estimate"
+  )
+```
