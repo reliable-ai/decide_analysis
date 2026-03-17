@@ -21,7 +21,7 @@ mv_hurr |>
 
 ```{r}
 #| fig-width: 10
-viz_multiverse_simple(mv_hurr, direction = "right")
+vis_multiverse_simple(mv_hurr, direction = "right")
 ```
 
 # Existing Methods

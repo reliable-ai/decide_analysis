@@ -211,7 +211,7 @@ vis_importance <- function(between_var, dim_prefix = "mv_dim_") {
     theme_classic()
 }
 
-viz_multiverse_simple <- function(
+vis_multiverse_simple <- function(
   mv,
   dim_prefix = "mv_dim_",
   direction = c("down", "up", "left", "right"),
