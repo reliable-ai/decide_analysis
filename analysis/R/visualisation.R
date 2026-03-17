@@ -17,8 +17,8 @@ vis_multiverse_tree <- function(
   dim_names <- sub(paste0("^", dim_prefix), "", dim_cols)
 
   # Only keep combinations that actually exist in the data
-  paths <- mv %>%
-    select(all_of(dim_cols)) %>%
+  paths <- mv |>
+    select(all_of(dim_cols)) |>
     distinct()
 
   # Build nodes and edges from existing paths
@@ -29,8 +29,8 @@ vis_multiverse_tree <- function(
   next_id <- 2L
 
   for (i in seq_along(dim_cols)) {
-    sub_paths <- paths %>%
-      select(all_of(dim_cols[1:i])) %>%
+    sub_paths <- paths |>
+      select(all_of(dim_cols[1:i])) |>
       distinct()
 
     for (r in seq_len(nrow(sub_paths))) {
@@ -76,16 +76,16 @@ vis_multiverse_tree <- function(
   # Decision labels
   if (show_decision_labels %in% c("coloured", "text")) {
     # Position labels between parent and child y-levels (midpoint of the split)
-    depth_y <- lay_df %>%
-      filter(depth > 0) %>%
-      group_by(depth) %>%
+    depth_y <- lay_df |>
+      filter(depth > 0) |>
+      group_by(depth) |>
       summarise(child_y = mean(y), .groups = "drop")
-    parent_y <- lay_df %>%
-      group_by(depth) %>%
-      summarise(parent_y = mean(y), .groups = "drop") %>%
+    parent_y <- lay_df |>
+      group_by(depth) |>
+      summarise(parent_y = mean(y), .groups = "drop") |>
       mutate(depth = depth + 1L)
-    decision_annot <- depth_y %>%
-      left_join(parent_y, by = "depth") %>%
+    decision_annot <- depth_y |>
+      left_join(parent_y, by = "depth") |>
       mutate(
         parent_y = coalesce(parent_y, child_y + 1),
         y_pos = child_y + (parent_y - child_y) * decision_label_pos,
@@ -94,7 +94,7 @@ vis_multiverse_tree <- function(
 
     x_range <- range(lay_df$x)
     x_offset <- diff(x_range) * 0.06 + 0.2
-    decision_annot <- decision_annot %>%
+    decision_annot <- decision_annot |>
       mutate(x_pos = x_range[1] - x_offset)
 
     if (show_decision_labels == "coloured") {
@@ -149,8 +149,8 @@ vis_multiverse_tree <- function(
 }
 
 vis_regression_coefficients <- function(reg_result, dim_prefix = "mv_dim_") {
-  df <- reg_result %>%
-    filter(term != "(Intercept)") %>%
+  df <- reg_result |>
+    filter(term != "(Intercept)") |>
     mutate(term_clean = sub(paste0("^", dim_prefix), "", term))
 
   # Find shared prefixes among terms to identify decisions.
@@ -171,17 +171,17 @@ vis_regression_coefficients <- function(reg_result, dim_prefix = "mv_dim_") {
     best
   }
 
-  df <- df %>%
+  df <- df |>
     mutate(
       decision = vapply(term_clean, find_decision, character(1)),
       option = mapply(function(t, d) {
         rest <- substring(t, nchar(d) + 1)
         if (rest == "") d else rest
       }, term_clean, decision)
-    ) %>%
+    ) |>
     mutate(decision = fct_reorder(decision, abs(estimate), .fun = max))
 
-  df %>%
+  df |>
     ggplot(aes(x = estimate, y = option)) +
     geom_vline(xintercept = 0, linetype = "dashed", colour = "grey50") +
     geom_pointrange(aes(
@@ -202,8 +202,8 @@ vis_importance <- function(between_var, dim_prefix = "mv_dim_") {
   tibble(
     decision = sub(paste0("^", dim_prefix), "", names(between_var)),
     mean_variance = unname(between_var)
-  ) %>%
-    mutate(decision = fct_reorder(decision, mean_variance)) %>%
+  ) |>
+    mutate(decision = fct_reorder(decision, mean_variance)) |>
     ggplot(aes(x = mean_variance, y = decision)) +
     geom_col() +
     labs(x = "Importance", y = NULL) +
