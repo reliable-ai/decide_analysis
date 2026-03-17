@@ -1,0 +1,76 @@
+---
+title: "Analyse Case Study: Hurricane"
+format: pdf
+---
+
+```{r setup}
+source("R/_load.R")
+```
+
+```{r}
+mv_hurr <- load_multiverse("hurricane")
+mv_hurr
+```
+
+# Overview
+
+```{r}
+mv_hurr |>
+  get_multiverse_decisions()
+```
+
+```{r}
+#| fig-width: 10
+viz_multiverse_simple(mv_hurr, direction = "right")
+```
+
+# Existing Methods
+
+## Regression
+
+```{r}
+reg_hurr <- calc_regression(mv_hurr, colname_metric = "mean_deaths")
+reg_hurr
+```
+
+```{r}
+vis_regression_coefficients(reg_hurr)
+```
+
+## FANOVA
+
+```{r}
+fanova_hurr <- calc_fanova(mv_hurr, colname_metric = "mean_deaths")
+fanova_hurr
+```
+
+```{r}
+fanova_hurr |>
+  head(10) |> 
+  fanova_to_vec() |> 
+  vis_importance()
+```
+
+
+# Our Framework
+
+```{r}
+within_hurr <- calc_within_bucket_variation(mv_hurr, colname_metric = "mean_deaths")
+within_hurr
+```
+
+```{r}
+vis_importance(within_hurr)
+```
+
+```{r}
+between_hurr <- calc_between_bucket_variation(mv_hurr, colname_metric = "mean_deaths")
+between_hurr
+```
+
+```{r}
+# NA leads to problem
+# vis_importance(between_hurr)
+```
+
+
