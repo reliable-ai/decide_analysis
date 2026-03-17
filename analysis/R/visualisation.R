@@ -210,3 +210,130 @@ vis_importance <- function(between_var, dim_prefix = "mv_dim_") {
     labs(x = "Importance", y = NULL) +
     theme_classic()
 }
+
+viz_multiverse_simple <- function(
+  mv,
+  dim_prefix = "mv_dim_",
+  direction = c("down", "up", "left", "right"),
+  label_size = 3,
+  show_dots = c("none", "coloured", "black"),
+  show_decision_labels = c("text", "coloured", "none"),
+  spine_linetype = "dashed"
+) {
+  direction <- match.arg(direction)
+  show_dots <- match.arg(show_dots)
+  show_decision_labels <- match.arg(show_decision_labels)
+
+  opts <- get_multiverse_decisions(mv, dim_prefix)
+  decisions <- names(opts)
+
+  # Build nodes and edges: each decision is a hub node fanning out to option
+  # leaves, with hubs chained vertically.
+  nodes <- tibble(
+    id = integer(), label = character(), decision = character(),
+    x = numeric(), y = numeric(), is_hub = logical()
+  )
+  edges <- tibble(from = integer(), to = integer(), edge_type = character())
+  next_id <- 1L
+  gap <- 2
+
+  for (i in seq_along(decisions)) {
+    options <- as.character(opts[[decisions[i]]])
+    n_opts <- length(options)
+    hub_y <- -(i - 1) * gap
+    leaf_y <- hub_y - 1
+
+    # Hub (fork point)
+    hub_id <- next_id
+    nodes <- bind_rows(nodes, tibble(
+      id = hub_id, label = decisions[i], decision = decisions[i],
+      x = 0, y = hub_y, is_hub = TRUE
+    ))
+    next_id <- next_id + 1L
+
+    # Connect from previous hub
+    if (i > 1) {
+      prev_hub <- nodes$id[nodes$is_hub][i - 1]
+      edges <- bind_rows(edges, tibble(from = prev_hub, to = hub_id, edge_type = "spine"))
+    }
+
+    # Leaf nodes: spread evenly around x = 0
+    x_pos <- seq_len(n_opts) - (n_opts + 1) / 2
+    for (j in seq_along(options)) {
+      leaf_id <- next_id
+      nodes <- bind_rows(nodes, tibble(
+        id = leaf_id, label = options[j], decision = decisions[i],
+        x = x_pos[j], y = leaf_y, is_hub = FALSE
+      ))
+      edges <- bind_rows(edges, tibble(from = hub_id, to = leaf_id, edge_type = "fan"))
+      next_id <- next_id + 1L
+    }
+  }
+
+  graph <- tbl_graph(nodes = nodes, edges = edges)
+
+  p <- ggraph(graph, layout = "manual", x = x, y = y) +
+    geom_edge_diagonal(
+      aes(linetype = edge_type), colour = "grey60", show.legend = FALSE
+    ) +
+    scale_edge_linetype_manual(values = c(fan = "solid", spine = spine_linetype))
+
+  # Dots on leaf nodes
+  if (show_dots == "coloured") {
+    p <- p +
+      geom_node_point(aes(filter = !is_hub, colour = decision), size = 3) +
+      labs(colour = "Decision")
+  } else if (show_dots == "black") {
+    p <- p +
+      geom_node_point(aes(filter = !is_hub), size = 2, colour = "grey30")
+  }
+
+  # Option labels below leaves
+  p <- p +
+    geom_node_text(
+      aes(filter = !is_hub, label = label),
+      nudge_y = -0.3, size = label_size
+    )
+
+  # Decision labels on the left side of each hub
+  if (show_decision_labels %in% c("text", "coloured")) {
+    hub_data <- nodes |> filter(is_hub)
+    x_range <- range(nodes$x)
+    x_offset <- diff(x_range) * 0.06 + 0.5
+    hub_data <- hub_data |>
+      mutate(x_pos = x_range[1] - x_offset)
+
+    if (show_decision_labels == "coloured") {
+      p <- p +
+        geom_text(
+          data = hub_data,
+          aes(x = x_pos, y = y, label = decision, colour = decision),
+          hjust = 1, size = label_size, fontface = "bold",
+          show.legend = FALSE, inherit.aes = FALSE
+        ) +
+        scale_x_continuous(expand = expansion(mult = c(0.15, 0.05)))
+    } else {
+      p <- p +
+        geom_text(
+          data = hub_data,
+          aes(x = x_pos, y = y, label = decision),
+          hjust = 1, size = label_size, fontface = "bold",
+          inherit.aes = FALSE
+        ) +
+        scale_x_continuous(expand = expansion(mult = c(0.15, 0.05)))
+    }
+  }
+
+  # Direction: transform coordinates to orient the tree
+  if (direction == "up") {
+    p <- p + scale_y_reverse() + coord_cartesian(clip = "off")
+  } else if (direction == "right") {
+    p <- p + scale_y_reverse() + coord_flip(clip = "off")
+  } else if (direction == "left") {
+    p <- p + coord_flip(clip = "off")
+  } else {
+    p <- p + coord_cartesian(clip = "off")
+  }
+
+  p + theme_void()
+}
