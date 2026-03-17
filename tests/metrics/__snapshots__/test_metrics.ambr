@@ -1,0 +1,15 @@
+# serializer version: 1
+# name: test_between_bucket_variation
+  dict({
+    'dim_A': np.float64(0.0185625),
+    'dim_B': np.float64(0.0043125),
+    'dim_C': np.float64(0.0005875),
+  })
+# ---
+# name: test_within_bucket_variation
+  dict({
+    0: np.float64(0.0101238095),
+    1: np.float64(0.0026583333),
+    2: np.float64(0.0005875),
+  })
+# ---
