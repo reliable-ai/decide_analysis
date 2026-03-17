@@ -1,6 +1,6 @@
 ---
 title: "Analyse Case Study: Fertility"
-format: html
+format: pdf
 ---
 
 ```{r setup}
