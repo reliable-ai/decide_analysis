@@ -137,15 +137,16 @@ vis_multiverse_tree <- function(
 
   # Direction: transform coordinates to orient the tree
   if (direction == "up") {
-    p <- p + scale_y_reverse()
+    p <- p + scale_y_reverse() + coord_cartesian(clip = "off")
   } else if (direction == "right") {
-    p <- p + scale_y_reverse() + coord_flip()
+    p <- p + scale_y_reverse() + coord_flip(clip = "off")
   } else if (direction == "left") {
-    p <- p + coord_flip()
+    p <- p + coord_flip(clip = "off")
+  } else {
+    p <- p + coord_cartesian(clip = "off")
   }
 
-  p + theme_void() +
-    coord_cartesian(clip = "off")
+  p + theme_void()
 }
 
 vis_regression_coefficients <- function(reg_result, dim_prefix = "mv_dim_") {
