@@ -24,6 +24,11 @@ mv_fert |>
 vis_multiverse_tree(mv_fert)
 ```
 
+```{r}
+#| fig-width: 9
+vis_multiverse_simple(mv_fert, direction = "right")
+```
+
 # Existing Methods
 
 ## Regression
@@ -43,6 +48,7 @@ vis_regression_coefficients(reg_fert)
 fanova_fert <- calc_fanova(mv_fert, colname_metric = "fertility_low_estimate")
 fanova_fert
 ```
+
 ```{r}
 fanova_fert |>
   head(10) |> 
@@ -50,6 +56,15 @@ fanova_fert |>
   vis_importance()
 ```
 
+Only main effects
+
+```{r}
+fanova_fert |>
+  filter(is.na(level_1)) |>
+  head(10) |> 
+  fanova_to_vec() |> 
+  vis_importance()
+```
 
 # Our Framework
 

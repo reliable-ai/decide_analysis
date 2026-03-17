@@ -51,6 +51,16 @@ fanova_hurr |>
   vis_importance()
 ```
 
+Only main effects
+
+```{r}
+fanova_hurr |>
+  filter(is.na(level_1)) |>
+  head(10) |> 
+  fanova_to_vec() |> 
+  vis_importance()
+```
+
 
 # Our Framework
 
