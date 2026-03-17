@@ -1,0 +1,101 @@
+---
+title: "Analyse Case Study: SIAB LTU Prediction"
+format: pdf
+---
+
+```{r setup}
+source("R/_load.R")
+```
+
+```{r}
+mv_siab_org <- load_multiverse("siab_jan")
+mv_siab_org
+```
+
+## Remove Single-Option Decisions
+
+There are a handful of decisions with only a single option, let's drop these to not throw off any of the algorithms.
+
+```{r}
+mv_siab_org |>
+  get_multiverse_decisions()
+```
+
+
+```{r}
+mv_siab <- mv_siab_org |> 
+  remove_fake_decisions()
+mv_siab
+```
+
+# Overview
+
+```{r}
+mv_siab |>
+  get_multiverse_decisions()
+```
+
+```{r}
+#| fig-width: 6
+#| fig-height: 10
+vis_multiverse_simple(mv_siab, direction = "down")
+```
+
+# Existing Methods
+
+## Regression
+
+```{r}
+reg_siab <- calc_regression(mv_siab, colname_metric = "perf_acc")
+reg_siab
+```
+
+```{r}
+vis_regression_coefficients(reg_siab)
+```
+
+## FANOVA
+
+```{r}
+fanova_siab <- calc_fanova(mv_siab, colname_metric = "perf_acc")
+fanova_siab
+```
+
+```{r}
+fanova_siab |>
+  head(10) |> 
+  fanova_to_vec() |> 
+  vis_importance()
+```
+
+Only main effects
+
+```{r}
+fanova_siab |>
+  filter(is.na(level_1)) |>
+  head(10) |> 
+  fanova_to_vec() |> 
+  vis_importance()
+```
+
+# Our Framework
+
+```{r}
+within_siab <- calc_within_bucket_variation(mv_siab, colname_metric = "perf_acc")
+within_siab
+```
+
+```{r}
+vis_importance(within_siab)
+```
+
+```{r}
+between_siab <- calc_between_bucket_variation(mv_siab, colname_metric = "perf_acc")
+between_siab
+```
+
+```{r}
+vis_importance(between_siab)
+```
+
+

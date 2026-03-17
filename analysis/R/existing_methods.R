@@ -1,3 +1,12 @@
+remove_fake_decisions <- function (mv, dim_prefix = "mv_dim_") {
+  dim_cols <- mv |> select(starts_with(dim_prefix)) |> colnames()
+  fake <- dim_cols[sapply(mv[dim_cols], n_distinct) <= 1]
+  if (length(fake) > 0) {
+    message("Dropping fake decisions: ", paste(sub(paste0("^", dim_prefix), "", fake), collapse = ", "))
+  }
+  mv |> select(-all_of(fake))
+}
+
 calc_fanova <- function (mv, colname_metric, dim_prefix = "mv_dim_") {
   use_virtualenv("../.venv/")
 
