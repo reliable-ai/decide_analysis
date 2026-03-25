@@ -11,6 +11,7 @@ import pandas as pd
 import numpy as np
 from copy import deepcopy
 from collections import defaultdict
+from itertools import combinations
 
 def organize_multiverse_results(multiverse_results: pd.DataFrame,
                                 dimension_order: list,
@@ -343,90 +344,200 @@ def total_variance_decomposition(multiverse_results: pd.MultiIndex,
             dictionary containing the three quantities described above.
     """
     
-    # create copy of the multiverse results to avoid modifying the original
-    multiverse_results = deepcopy(multiverse_results)
-    
     # get the list of dimension columns (judgment calls) in order
     dimension_cols = [col for col in multiverse_results.columns
                       if col[1] == "dimension"]
     dimension_names = [col[0] for col in dimension_cols]
-    
+
     # get the number of unique values for each dimension (judgment call)
-    num_unique_values_by_dimension = {}
-    for dimension in dimension_names:
-        num_unique_values = multiverse_results[(dimension, "dimension")].nunique()
-        num_unique_values_by_dimension[dimension] = num_unique_values
-    
-    # set up storage for later
-    variance_decomposition = defaultdict(dict)
-    
+    num_unique_values_by_dimension = {
+        dimension: multiverse_results[(dimension, "dimension")].nunique()
+        for dimension in dimension_names
+    }
+
+    perf_col = (performance_metric, "performance_metric")
+
+    # var_total is identical for every target dimension, so compute it once
+    var_total = np.var(multiverse_results[perf_col])
+
+    variance_decomposition = {}
+
     # for each decision point s_i, we want to calculate the three quantities.
     # thus, we must condition on the groups determined by the other decisions,
     # which means we want to group by the other dimensions and calculate the
     # variance within each group and the mean within each group.
-    for depth, target_dim in enumerate(dimension_names):
-        
-        # initialize `target_dim` in the variance decomposition dictionary
-        variance_decomposition[target_dim] = {
-            "var_total": np.var(multiverse_results[(performance_metric, "performance_metric")]),
-            "var_of_groups": [],
-            "expected_value_of_groups": [],
-        }
-        
+    for target_dim in dimension_names:
+
         # get s_j where i!=j (i.e., all dimensions except the target dimension)
         other_dims = [d for d in dimension_names if d != target_dim]
-        
-        # get all unique combinations of the OTHER dimensions
         other_dim_cols = [(d, "dimension") for d in other_dims]
-        unique_other_combos = multiverse_results[other_dim_cols] \
-            .drop_duplicates()
-        
+
         # assert that the number of unique combinations of the other dimensions
         # is equal to the product of the number of unique values
         # for each of the other dimensions.
         expected_num_groups = np.prod([num_unique_values_by_dimension[d] for d in other_dims])
+        unique_other_combos = multiverse_results[other_dim_cols].drop_duplicates()
         assert unique_other_combos.shape[0] == expected_num_groups, \
             f"Expected {expected_num_groups} unique groups, but found {unique_other_combos.shape[0]} groups."
 
-        # loop through each group (unique combination of the other dimensions)
-        for row_idx, other_decisions in unique_other_combos.iterrows():
-            
-            # filter to rows matching this combination of other decisions
-            mask = pd.Series(True, index=multiverse_results.index)
-            for other_dim in other_dims:
-                mask &= (multiverse_results[(other_dim, "dimension")]
-                         == other_decisions[(other_dim, "dimension")])
-            subset = multiverse_results.loc[mask]
-            
-            # assert that the number of observations in the subset is equal to
-            # the number of unique values for the target dimension
-            expected_num_observations = num_unique_values_by_dimension[target_dim]
-            assert subset.shape[0] == expected_num_observations, \
-                f"Expected {expected_num_observations} observations in subset, but found {subset.shape[0]} observations."
+        expected_num_observations = num_unique_values_by_dimension[target_dim]
 
-            # calculate the variance of the performance metric within this group
-            # this represents $Var(Y | X=x)$, where $x$ is this particular group
-            var_within_group = subset[(performance_metric, "performance_metric")].var()
-            
-            # calculate the mean of the performance metric within this group
-            # this represents $E[Y | X=x]$, where $x$ is this particular group
-            mean_within_group = subset[(performance_metric, "performance_metric")].mean()
-            
-            # store these values
-            variance_decomposition[target_dim]["var_of_groups"].append(var_within_group)
-            variance_decomposition[target_dim]["expected_value_of_groups"].append(mean_within_group)
-            
-        # after looping through all groups, we can calculate the expected variance
-        # within groups and the variance of the expected values across groups for this target dimension
-        variance_decomposition[target_dim]["expected_var_within_groups"] = \
-            np.mean(variance_decomposition[target_dim]["var_of_groups"])
-        variance_decomposition[target_dim]["var_of_expected_values_across_groups"] = \
-            np.var(variance_decomposition[target_dim]["expected_value_of_groups"])
-            
-    # remove the lists of variances and expected values for each group,
-    # since those were just intermediate values
-    for target_dim in dimension_names:
-        del variance_decomposition[target_dim]["var_of_groups"]
-        del variance_decomposition[target_dim]["expected_value_of_groups"]
-            
+        if other_dim_cols:
+            # replace the row-by-row mask loop with a vectorized groupby;
+            # select the perf column as a Series first to avoid pandas tuple-key ambiguity
+            grouped = multiverse_results[perf_col].groupby(
+                [multiverse_results[col] for col in other_dim_cols]
+            )
+
+            group_sizes = grouped.size()
+            assert (group_sizes == expected_num_observations).all(), \
+                f"Expected {expected_num_observations} observations in each group, but found otherwise."
+
+            group_vars  = grouped.var(ddof=0)  # use population variance for within-group variance
+            group_means = grouped.mean()
+        else:
+            # only one dimension: the single group is the full dataset
+            assert len(multiverse_results) == expected_num_observations, \
+                f"Expected {expected_num_observations} observations in subset, but found {len(multiverse_results)} observations."
+            group_vars  = pd.Series([multiverse_results[perf_col].var(ddof=0)])  # use population variance for within-group variance
+            group_means = pd.Series([multiverse_results[perf_col].mean()])
+
+        variance_decomposition[target_dim] = {
+            "var_total": var_total,
+            # E[Var(Y|X)]: mean of within-group variances
+            "expected_var_within_groups": np.mean(group_vars),
+            # Var(E[Y|X]): population variance (ddof=0) of group means, matching np.var default
+            "var_of_expected_values_across_groups": np.var(group_means),
+        }
+
+    return variance_decomposition
+
+def total_variance_decomposition_with_interactions(
+    multiverse_results: pd.MultiIndex,
+    performance_metric: str
+) -> dict:
+    """
+    Applies the law of total variance, which tells us that for random variables
+    $X$ and $Y$, $Var(Y) = E[Var(Y | X)] + Var(E[Y | X])$.
+
+    The given `multiverse_results` object contains the final results for each
+    universe, such that each universe is one row, with the columns representing
+    the judgment calls made and the performance of that universe according to
+    various user-selected metrics (e.g. accuracy, MSE, etc.).
+
+    Consider one judgment call which we would like to examine to determine how
+    much variation in the final result stems from this decision. In this case,
+    the "groups" that we are conditioning on are determined by the other
+    decisions made, such that each group consists of the universes where the
+    set of decisions made for the other decisions are identical. If we have $d$
+    decisions, each one having $c_1, ..., c_d$ options, and we are interested in
+    the $i$th decision, that means that there are $c_1 * ... * c_{i-1} * c_{i+1}
+    * c_d$ groups of size $c_i$.
+
+    For each decision $i$ in {1, ..., $d$}, we want to calculate the following
+    three quantities:
+    1. $Var(Y)$: the variance of the performance metric across all universes in
+        the multiverse.
+    2. $E[Var(Y | X)]$: the expected variance of the performance metric
+        within each group.
+    3. $Var(E[Y | X])$: the variance of the expected performance metric
+        across groups.
+
+    Furthermore, instead of just treating X as one single decision, we can also
+    consider the interaction effects between decisions by potentially
+    treating X as multiple decisions. For example, if we have three decisions
+    X_1, X_2, and X_3, we could consider the interaction effects between X_1 and
+    X_2 by getting $Var(Y) = E[Var(Y | X_1, X_2)] + Var(E[Y | X_1, X_2])$. This
+    function will also calculate the variance decomposition for all combinations
+    of interactions between the decisions, so in this example it would calculate
+    the variance decomposition for X_1, X_2, X_3, the interaction between X_1
+    and X_2, the interaction between X_1 and X_3, the interaction between X_2
+    and X_3, and the interaction between X_1, X_2, and X_3.
+
+    Inputs:
+        multiverse_results (pd.DataFrame): A DataFrame containing the results
+            of the multiverse analysis, with a MultiIndex for columns where
+            the first level indicates the name of the column and the second
+            level indicates whether it is a "dimension" (judgment call) or a
+            "performance_metric".
+        performance_metric (str): The name of the performance metric to analyze.
+
+    Returns:
+        dict: A dictionary mapping each judgment call (dimension name) to a
+            dictionary containing the three quantities described above.
+    """
+
+    # get the list of dimension columns (judgment calls) in order
+    dimension_cols = [col for col in multiverse_results.columns
+                      if col[1] == "dimension"]
+    dimension_names = [col[0] for col in dimension_cols]
+
+    # get the number of unique values for each dimension (judgment call)
+    num_unique_values_by_dimension = {
+        dimension: multiverse_results[(dimension, "dimension")].nunique()
+        for dimension in dimension_names
+    }
+
+    perf_col = (performance_metric, "performance_metric")
+
+    # var_total is identical for every subset, so compute it once
+    var_total = np.var(multiverse_results[perf_col])
+
+    variance_decomposition = {}
+
+    # iterate over all non-empty subsets of dimensions (size 1 = main effects,
+    # size > 1 = interaction terms). for each subset, X is the joint variable
+    # formed by those dimensions, and we condition on the remaining dimensions.
+    for size in range(1, len(dimension_names) + 1):
+        for target_dims in combinations(dimension_names, size):
+            target_dims_set = set(target_dims)
+
+            # the "other" dimensions are those not in the current subset
+            other_dims = [d for d in dimension_names if d not in target_dims_set]
+            other_dim_cols = [(d, "dimension") for d in other_dims]
+
+            # each group contains all combinations of the target dims' values,
+            # so the expected group size is the product of their unique counts
+            expected_num_observations = np.prod([num_unique_values_by_dimension[d] for d in target_dims])
+
+            if other_dim_cols:
+                # assert that the number of unique combinations of the other dimensions
+                # is equal to the product of the number of unique values
+                # for each of the other dimensions.
+                # (skipped when other_dim_cols is empty: df[[]] behaves unexpectedly
+                # with MultiIndex columns, and the single-group case is trivially correct)
+                expected_num_groups = np.prod([num_unique_values_by_dimension[d] for d in other_dims])
+                unique_other_combos = multiverse_results[other_dim_cols].drop_duplicates()
+                assert unique_other_combos.shape[0] == expected_num_groups, \
+                    f"Expected {expected_num_groups} unique groups, but found {unique_other_combos.shape[0]} groups."
+
+                # group by the other dimensions; select perf column as a Series
+                # first to avoid pandas tuple-key ambiguity on MultiIndex columns
+                grouped = multiverse_results[perf_col].groupby(
+                    [multiverse_results[col] for col in other_dim_cols]
+                )
+
+                group_sizes = grouped.size()
+                assert (group_sizes == expected_num_observations).all(), \
+                    f"Expected {expected_num_observations} observations in each group, but found otherwise."
+
+                group_vars  = grouped.var(ddof=0)  # use population variance for within-group variance
+                group_means = grouped.mean()
+            else:
+                # all dimensions are in the target subset: one group = full dataset
+                assert len(multiverse_results) == expected_num_observations, \
+                    f"Expected {expected_num_observations} observations, but found {len(multiverse_results)}."
+                group_vars  = pd.Series([multiverse_results[perf_col].var(ddof=0)])  # use population variance for within-group variance
+                group_means = pd.Series([multiverse_results[perf_col].mean()])
+
+            # use a tuple key for all entries so single and multi-dim keys are
+            # the same type and interaction keys are unambiguous
+            variance_decomposition[target_dims] = {
+                "var_total": var_total,
+                # E[Var(Y|X)]: mean of within-group variances
+                "expected_var_within_groups": np.mean(group_vars),
+                # Var(E[Y|X]): population variance (ddof=0) of group means
+                "var_of_expected_values_across_groups": np.var(group_means),
+            }
+
     return variance_decomposition
