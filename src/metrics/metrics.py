@@ -74,7 +74,7 @@ def path_within_bucket_variation(multiverse_results: pd.DataFrame,
             
     # calculate the variance of the performance metric across the remaining
     # universes (i.e., different combinations of the remaining judgment calls)
-    variance = multiverse_results[(performance_metric, "performance_metric")].var()
+    variance = multiverse_results[(performance_metric, "performance_metric")].var(ddof=0)  # use population variance for within-bucket variation
     
     return variance
 
