@@ -47,7 +47,7 @@ vis_multiverse_simple(mv_siab, direction = "down")
 
 ```{r}
 reg_siab <- calc_regression(mv_siab, colname_metric = "perf_acc")
-reg_siab
+attr(reg_siab, "tidy")
 ```
 
 ```{r}

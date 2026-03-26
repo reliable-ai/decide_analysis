@@ -1,5 +1,5 @@
 vis_regression_coefficients <- function(reg_result, dim_prefix = "mv_dim_") {
-  df <- reg_result |>
+  df <- attr(reg_result, "tidy") |>
     filter(term != "(Intercept)") |>
     mutate(term_clean = sub(paste0("^", dim_prefix), "", term))
 

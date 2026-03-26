@@ -30,13 +30,13 @@ vis_multiverse_simple(mv_hurr, direction = "right")
 
 ```{r}
 reg_hurr <- calc_regression(mv_hurr, colname_metric = "mean_deaths")
-reg_hurr
+attr(reg_hurr, "tidy")
 ```
 
 ### Performance
 
 ```{r}
-attr(reg_hurr, "model") |> 
+reg_hurr |> 
   model_performance()
 ```
 
@@ -47,14 +47,14 @@ attr(reg_hurr, "model") |>
 #| fig-width: 9
 #| fig-height: 12
 # All-in-one model checks
-attr(reg_hurr, "model") |> 
+reg_hurr |> 
   check_model()
 ```
 
 Posterior predictive check comparing simulated data from the model to actual observed data. Uses R's `simulate()` function on the lm.
 
 ```{r}
-attr(reg_hurr, "model") |> 
+reg_hurr |> 
   check_predictions()
 ```
 

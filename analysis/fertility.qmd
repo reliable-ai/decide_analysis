@@ -35,7 +35,7 @@ vis_multiverse_simple(mv_fert, direction = "right")
 
 ```{r}
 reg_fert <- calc_regression(mv_fert, colname_metric = "fertility_low_estimate")
-reg_fert
+attr(reg_fert, "tidy")
 ```
 
 ```{r}

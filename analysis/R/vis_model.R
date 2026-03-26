@@ -1,9 +1,7 @@
 vis_residuals_vs_fitted <- function(reg_result) {
-  model <- attr(reg_result, "model")
-
   df <- tibble(
-    fitted = fitted(model),
-    residuals = residuals(model)
+    fitted = fitted(reg_result),
+    residuals = residuals(reg_result)
   )
 
   df |>
@@ -17,11 +15,10 @@ vis_residuals_vs_fitted <- function(reg_result) {
 
 vis_observed_vs_predicted <- function(reg_result, type = c("scatter", "hist", "kde"), facet = FALSE) {
   type <- match.arg(type)
-  model <- attr(reg_result, "model")
 
   df <- tibble(
-    observed = model$model[[1]],
-    predicted = fitted(model)
+    observed = reg_result$model[[1]],
+    predicted = fitted(reg_result)
   )
 
   if (type == "scatter") {

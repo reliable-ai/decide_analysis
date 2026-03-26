@@ -61,9 +61,8 @@ calc_regression <- function (mv, colname_metric, dim_prefix = "mv_dim_") {
 
   lm_fitted <- lm(formula, data = mv)
 
-  result <- tidy(lm_fitted)
-  attr(result, "model") <- lm_fitted
-  attr(result, "formula") <- formula
+  attr(lm_fitted, "tidy") <- tidy(lm_fitted)
+  attr(lm_fitted, "formula") <- formula
 
-  return(result)
+  return(lm_fitted)
 }
