@@ -33,6 +33,53 @@ reg_hurr <- calc_regression(mv_hurr, colname_metric = "mean_deaths")
 reg_hurr
 ```
 
+### Performance
+
+```{r}
+attr(reg_hurr, "model") |> 
+  model_performance()
+```
+
+
+### Model Fit
+
+```{r}
+#| fig-width: 9
+#| fig-height: 12
+# All-in-one model checks
+attr(reg_hurr, "model") |> 
+  check_model()
+```
+
+Posterior predictive check comparing simulated data from the model to actual observed data. Uses R's `simulate()` function on the lm.
+
+```{r}
+attr(reg_hurr, "model") |> 
+  check_predictions()
+```
+
+
+```{r}
+vis_residuals_vs_fitted(reg_hurr)
+```
+
+```{r}
+vis_observed_vs_predicted(reg_hurr)
+```
+
+```{r}
+vis_observed_vs_predicted(reg_hurr, type = "kde")
+```
+
+
+```{r}
+#| fig-height: 3
+#| fig-width: 7
+vis_observed_vs_predicted(reg_hurr, type = "hist", facet = T)
+```
+
+### Coefficients
+
 ```{r}
 vis_regression_coefficients(reg_hurr)
 ```

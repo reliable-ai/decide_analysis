@@ -5,6 +5,7 @@ suppressPackageStartupMessages({
   library(tidygraph)
   library(ggraph)
   library(reticulate)
+  library(performance)
 })
 
 # Load all scripts in the R directory, which do *not* start with a `_`
