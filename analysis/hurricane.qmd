@@ -80,7 +80,14 @@ between_hurr
 
 ```{r}
 # NA leads to problem
-# vis_importance(between_hurr)
+vis_importance(between_hurr)
 ```
 
+## Combine
 
+```{r}
+vis_importance_2dim(
+  between_hurr,
+  fanova_hurr |> fanova_to_vec()
+)
+```

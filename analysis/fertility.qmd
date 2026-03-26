@@ -86,6 +86,15 @@ between_fert
 vis_importance(between_fert)
 ```
 
+## Combine
+
+```{r}
+vis_importance_2dim(
+  between_fert,
+  fanova_fert |> fanova_to_vec()
+)
+```
+
 # Decisions
 
 For relationship_status options 1 and 2 we observe perfect overlap.

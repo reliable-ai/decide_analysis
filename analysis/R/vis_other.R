@@ -53,9 +53,28 @@ vis_importance <- function(between_var, dim_prefix = "mv_dim_") {
     decision = sub(paste0("^", dim_prefix), "", names(between_var)),
     mean_variance = unname(between_var)
   ) |>
-    mutate(decision = fct_reorder(decision, mean_variance)) |>
+    mutate(decision = fct_reorder(decision, mean_variance |> replace_na(0))) |>
     ggplot(aes(x = mean_variance, y = decision)) +
     geom_col() +
     labs(x = "Importance", y = NULL) +
+    theme_classic()
+}
+
+vis_importance_2dim <- function(importance_x, importance_y,
+                               dim_prefix = "mv_dim_") {
+  label_x <- deparse(substitute(importance_x))
+  label_y <- deparse(substitute(importance_y))
+
+  df <- tibble(
+    decision = sub(paste0("^", dim_prefix), "", names(importance_x)),
+    x = unname(importance_x),
+    y = unname(importance_y[names(importance_x)])
+  )
+
+  df |>
+    ggplot(aes(x = x, y = y, label = decision)) +
+    geom_point() +
+    ggrepel::geom_text_repel() +
+    labs(x = label_x, y = label_y) +
     theme_classic()
 }

@@ -98,6 +98,16 @@ between_siab
 vis_importance(between_siab)
 ```
 
+## Combine
+
+```{r}
+vis_importance_2dim(
+  between_siab,
+  fanova_siab |> fanova_to_vec()
+)
+```
+
+
 # Decisions
 
 ```{r}
