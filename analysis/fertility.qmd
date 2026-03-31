@@ -38,6 +38,48 @@ reg_fert <- calc_regression(mv_fert, colname_metric = "fertility_low_estimate")
 attr(reg_fert, "tidy")
 ```
 
+### Performance
+
+```{r}
+reg_fert |>
+  model_performance()
+```
+
+### Model Fit
+
+```{r}
+#| fig-width: 9
+#| fig-height: 12
+# All-in-one model checks
+reg_fert |>
+  check_model()
+```
+
+Posterior predictive check comparing simulated data from the model to actual observed data. Uses R's `simulate()` function on the lm.
+
+```{r}
+reg_fert |>
+  check_predictions()
+```
+
+```{r}
+vis_residuals_vs_fitted(reg_fert)
+```
+
+```{r}
+vis_observed_vs_predicted(reg_fert)
+```
+
+```{r}
+vis_observed_vs_predicted(reg_fert, type = "kde")
+```
+
+```{r}
+#| fig-height: 3
+#| fig-width: 7
+vis_observed_vs_predicted(reg_fert, type = "hist", facet = T)
+```
+
 ```{r}
 vis_regression_coefficients(reg_fert)
 ```

@@ -50,6 +50,48 @@ reg_siab <- calc_regression(mv_siab, colname_metric = "perf_acc")
 attr(reg_siab, "tidy")
 ```
 
+### Performance
+
+```{r}
+reg_siab |>
+  model_performance()
+```
+
+### Model Fit
+
+```{r}
+#| fig-width: 9
+#| fig-height: 12
+# All-in-one model checks
+reg_siab |>
+  check_model()
+```
+
+Posterior predictive check comparing simulated data from the model to actual observed data. Uses R's `simulate()` function on the lm.
+
+```{r}
+reg_siab |>
+  check_predictions()
+```
+
+```{r}
+vis_residuals_vs_fitted(reg_siab)
+```
+
+```{r}
+vis_observed_vs_predicted(reg_siab)
+```
+
+```{r}
+vis_observed_vs_predicted(reg_siab, type = "kde")
+```
+
+```{r}
+#| fig-height: 3
+#| fig-width: 7
+vis_observed_vs_predicted(reg_siab, type = "hist", facet = T)
+```
+
 ```{r}
 vis_regression_coefficients(reg_siab)
 ```
