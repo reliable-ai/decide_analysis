@@ -7,7 +7,8 @@ vis_multiverse_tree <- function(
   label_size = 3,
   show_dots = c("none", "coloured", "black"),
   show_decision_labels = c("text", "coloured", "none"),
-  decision_label_pos = 0.6
+  decision_label_pos = 0.6,
+  decision_label_angle = 0
 ) {
   direction <- match.arg(direction)
   show_dots <- match.arg(show_dots)
@@ -103,6 +104,7 @@ vis_multiverse_tree <- function(
           data = decision_annot,
           aes(x = x_pos, y = y_pos, label = decision, colour = decision),
           hjust = 1, size = label_size, fontface = "bold",
+          angle = decision_label_angle,
           show.legend = FALSE, inherit.aes = FALSE
         ) +
         scale_x_continuous(expand = expansion(mult = c(0.15, 0.05)))
@@ -112,6 +114,7 @@ vis_multiverse_tree <- function(
           data = decision_annot,
           aes(x = x_pos, y = y_pos, label = decision),
           hjust = 1, size = label_size, fontface = "bold",
+          angle = decision_label_angle,
           inherit.aes = FALSE
         ) +
         scale_x_continuous(expand = expansion(mult = c(0.15, 0.05)))
@@ -157,7 +160,10 @@ vis_multiverse_simple <- function(
   label_size = 3,
   show_dots = c("none", "coloured", "black"),
   show_decision_labels = c("text", "coloured", "none"),
-  spine_linetype = "dashed"
+  spine_linetype = "dashed",
+  decision_label_pos = 0.6,
+  decision_label_angle = 0,
+  option_label_offset_x = 0
 ) {
   direction <- match.arg(direction)
   show_dots <- match.arg(show_dots)
@@ -227,11 +233,15 @@ vis_multiverse_simple <- function(
       geom_node_point(aes(filter = !is_hub), size = 2, colour = "grey30")
   }
 
-  # Option labels below leaves
+  # Option labels below leaves (nudged outward from center by option_label_offset_x)
+  leaf_data <- nodes |>
+    filter(!is_hub) |>
+    mutate(x_label = x + sign(x) * option_label_offset_x)
   p <- p +
-    geom_node_text(
-      aes(filter = !is_hub, label = label),
-      nudge_y = -0.3, size = label_size
+    geom_text(
+      data = leaf_data,
+      aes(x = x_label, y = y, label = label),
+      size = label_size, inherit.aes = FALSE
     )
 
   # Decision labels on the left side of each hub
@@ -240,14 +250,18 @@ vis_multiverse_simple <- function(
     x_range <- range(nodes$x)
     x_offset <- diff(x_range) * 0.06 + 0.5
     hub_data <- hub_data |>
-      mutate(x_pos = x_range[1] - x_offset)
+      mutate(
+        x_pos = x_range[1] - x_offset,
+        y_pos = (y - 1) + decision_label_pos
+      )
 
     if (show_decision_labels == "coloured") {
       p <- p +
         geom_text(
           data = hub_data,
-          aes(x = x_pos, y = y, label = decision, colour = decision),
+          aes(x = x_pos, y = y_pos, label = decision, colour = decision),
           hjust = 1, size = label_size, fontface = "bold",
+          angle = decision_label_angle,
           show.legend = FALSE, inherit.aes = FALSE
         ) +
         scale_x_continuous(expand = expansion(mult = c(0.15, 0.05)))
@@ -255,8 +269,9 @@ vis_multiverse_simple <- function(
       p <- p +
         geom_text(
           data = hub_data,
-          aes(x = x_pos, y = y, label = decision),
+          aes(x = x_pos, y = y_pos, label = decision),
           hjust = 1, size = label_size, fontface = "bold",
+          angle = decision_label_angle,
           inherit.aes = FALSE
         ) +
         scale_x_continuous(expand = expansion(mult = c(0.15, 0.05)))

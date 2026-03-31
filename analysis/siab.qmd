@@ -41,6 +41,13 @@ mv_siab |>
 vis_multiverse_simple(mv_siab, direction = "down")
 ```
 
+
+```{r}
+#| fig-width: 11
+#| fig-height: 4
+vis_multiverse_simple(mv_siab, direction = "right", decision_label_pos = 0, decision_label_angle = -7, option_label_offset_x = 0.1)
+```
+
 # Existing Methods
 
 ## Regression
