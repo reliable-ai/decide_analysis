@@ -29,7 +29,7 @@ vis_multiverse_simple(mv_hurr, direction = "right")
 ## Regression
 
 ```{r}
-reg_hurr <- calc_regression(mv_hurr, colname_metric = "mean_deaths")
+reg_hurr <- calc_regression(mv_hurr, colname_metric = "expected_deaths_diff")
 attr(reg_hurr, "tidy")
 ```
 
@@ -87,7 +87,7 @@ vis_regression_coefficients(reg_hurr)
 ## FANOVA
 
 ```{r}
-fanova_hurr <- calc_fanova(mv_hurr, colname_metric = "mean_deaths")
+fanova_hurr <- calc_fanova(mv_hurr, colname_metric = "expected_deaths_diff")
 fanova_hurr
 ```
 
@@ -112,7 +112,7 @@ fanova_hurr |>
 # Our Framework
 
 ```{r}
-within_hurr <- calc_within_bucket_variation(mv_hurr, colname_metric = "mean_deaths")
+within_hurr <- calc_within_bucket_variation(mv_hurr, colname_metric = "expected_deaths_diff")
 within_hurr
 ```
 
@@ -121,7 +121,7 @@ vis_importance(within_hurr)
 ```
 
 ```{r}
-between_hurr <- calc_between_bucket_variation(mv_hurr, colname_metric = "mean_deaths")
+between_hurr <- calc_between_bucket_variation(mv_hurr, colname_metric = "expected_deaths_diff")
 between_hurr
 ```
 
