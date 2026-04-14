@@ -302,6 +302,72 @@ def between_bucket_variation(multiverse_results: pd.MultiIndex,
     
     return between_variation
 
+def buv_interactions(
+    multiverse_results: pd.DataFrame,
+    performance_metric: str,
+) -> dict:
+    """
+    Computes BUV_int(i, k) for all pairs of dimensions (i < k).
+
+    For each pair, fixes all other dimensions and computes the pure interaction
+    variance V_joint - V_i - V_k, then averages over all fixed contexts.
+
+    V_joint is the variance of the full c_i x c_k grid of outcomes. V_i is the
+    variance of the row means (marginalising over k), and V_k is the variance of
+    the column means (marginalising over i). Their difference isolates the
+    variance attributable strictly to the joint movement of i and k, removing
+    each dimension's independent main effect.
+
+    Args:
+        multiverse_results: DataFrame with MultiIndex columns
+            (name, "dimension"|"performance_metric").
+        performance_metric: Name of the performance metric to analyze.
+
+    Returns:
+        dict mapping (dim_i, dim_k) tuples to BUV_int(i, k) float values.
+    """
+    dimension_cols = [col for col in multiverse_results.columns 
+                      if col[1] == "dimension"]
+    dimension_names = [col[0] for col in dimension_cols]
+    
+    perf_col = (performance_metric, "performance_metric")
+    buv_int = {}
+
+    for dim_i, dim_k in combinations(dimension_names, 2):
+        other_dims = [d for d in dimension_names if d != dim_i and d != dim_k]
+        other_dim_cols = [(d, "dimension") for d in other_dims]
+
+        if other_dim_cols:
+            # V_joint: Variance over the i*k grid for each context
+            # We use [[perf_col]] to avoid the tuple-subsetting error, then extract the Series
+            v_joint = multiverse_results.groupby(other_dim_cols)[[perf_col]].var(ddof=0)[perf_col]
+            
+            # V_i: Average over k first, then take variance over i within each context
+            mean_over_k = multiverse_results.groupby(other_dim_cols + [(dim_i, "dimension")])[[perf_col]].mean()[perf_col]
+            v_i = mean_over_k.groupby(level=list(range(len(other_dim_cols)))).var(ddof=0)
+            
+            # V_k: Average over i first, then take variance over k within each context
+            mean_over_i = multiverse_results.groupby(other_dim_cols + [(dim_k, "dimension")])[[perf_col]].mean()[perf_col]
+            v_k = mean_over_i.groupby(level=list(range(len(other_dim_cols)))).var(ddof=0)
+            
+            # Average the interaction variance across all fixed contexts
+            interaction_var = (v_joint - v_i - v_k).mean()
+            
+        else:
+            # Edge case: Only two dimensions exist in the entire dataset
+            v_joint = multiverse_results[perf_col].var(ddof=0)
+            
+            # Wrap grouping keys in lists to ensure safe MultiIndex tuple handling
+            v_i = multiverse_results.groupby([(dim_i, "dimension")])[[perf_col]].mean()[perf_col].var(ddof=0)
+            v_k = multiverse_results.groupby([(dim_k, "dimension")])[[perf_col]].mean()[perf_col].var(ddof=0)
+            
+            interaction_var = v_joint - v_i - v_k
+
+        buv_int[(dim_i, dim_k)] = float(interaction_var)
+
+    return buv_int
+
+
 def total_variance_decomposition(multiverse_results: pd.MultiIndex,
                                  performance_metric: str) -> dict:
     """
