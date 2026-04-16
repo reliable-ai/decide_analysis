@@ -1,0 +1,44 @@
+[dimensions]
+death_outliers = [
+    "no_exclusion",
+    "most_extreme_deaths",
+    "most_extreme_two_deaths",
+]
+
+damage_outliers = [
+    "no_exclusion",
+    "most_extreme_one_damage",
+    "most_extreme_two_damage",
+    "most_extreme_three_damage",
+]
+
+femininity_calculation = [
+    "masfem",
+    "female",
+]
+
+damage_transform = [
+    "no_transform",
+    "log_transform",
+]
+
+model = [
+    "linear",
+    "poisson",
+]
+
+main_interaction = [
+    "no",
+    "yes",
+]
+
+# Fixed: other_predictors = "none"
+other_predictors = [
+    "none",
+]
+
+covariates = [
+    "1",
+    "2",
+    "3",
+]
