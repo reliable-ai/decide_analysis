@@ -48,6 +48,14 @@ vis_multiverse_simple(mv_siab, direction = "down")
 vis_multiverse_simple(mv_siab, direction = "right", decision_label_pos = 0, decision_label_angle = -7, option_label_offset_x = 0.1)
 ```
 
+```{r}
+mv_siab |> 
+  ggplot() +
+  aes(x = perf_acc) +
+  geom_histogram(fill = "red", alpha = 0.7)
+```
+
+
 # Existing Methods
 
 ## Regression
