@@ -29,7 +29,7 @@ calc_fanova <- function (mv, colname_metric, dim_prefix = "mv_dim_") {
   mv_fav <- mv_fanova_mod$MultiverseFanova(features = X_pd, outcome = y_pd)
   result_pd <- mv_fav$quantify_importance(save_to = result_csv)
 
-  importance <- read_csv(result_csv) |>
+  importance <- read_csv(result_csv, show_col_types = FALSE) |>
     rename(
       individual_importance = `individual importance`,
       total_importance = `total importance`
