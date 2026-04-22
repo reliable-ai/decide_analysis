@@ -91,7 +91,8 @@ def within_bucket_variation(multiverse_results: pd.MultiIndex,
         performance_metric (str): The name of the performance metric to analyze.
     Returns:
         dict: A dictionary containing the within-bucket variation of each
-            judgment call for the specified performance metric.
+            judgment call for the specified performance metric. Keys are the
+            dimension names, values are the variation.
     """
         
     # because the judgment calls are organized chronologically, we can calculate
@@ -167,6 +168,7 @@ def within_bucket_variation(multiverse_results: pd.MultiIndex,
     # range_of_decreases_in_variance_by_depth = {}
     mean_decrease_in_variance_by_depth = {}
     for depth, paths_with_var in var_by_depth.items():
+        dimension_name = multiverse_results.columns[depth][0]
         decreases_in_variance = []
         for path_tuple, var in paths_with_var.items():
             # get the paths that are one decision away from this path (i.e.,
@@ -197,7 +199,7 @@ def within_bucket_variation(multiverse_results: pd.MultiIndex,
         # variance at this depth, such as range, variance, etc.
         # range_of_decreases_in_variance_by_depth[depth] = \
         #     np.max(decreases_in_variance) - np.min(decreases_in_variance)
-        mean_decrease_in_variance_by_depth[depth] = np.mean(decreases_in_variance)
+        mean_decrease_in_variance_by_depth[dimension_name] = np.mean(decreases_in_variance)
     
     return mean_decrease_in_variance_by_depth
 
