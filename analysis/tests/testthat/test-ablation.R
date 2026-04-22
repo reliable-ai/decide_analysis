@@ -1,0 +1,204 @@
+# Tests for ablation-study helpers used in the hurricane analysis.
+
+source(here::here("R", "_load.R"))
+testthat::local_edition(3)
+
+make_example_multiverse <- function() {
+  tibble(
+    mv_dim_A = rep(c("a1", "a2"), each = 4),
+    mv_dim_B = rep(rep(c("b1", "b2"), each = 2), 2),
+    mv_dim_C = rep(c("c1", "c2"), 4),
+    accuracy = c(0.80, 0.82, 0.70, 0.73, 0.60, 0.63, 0.50, 0.55)
+  )
+}
+
+test_that("build_ablation_grid enumerates every decision-option combination", {
+  grid <- build_ablation_grid(make_example_multiverse())
+
+  expect_equal(nrow(grid), 6)
+  expect_equal(unique(grid$fixed_decision), c("mv_dim_A", "mv_dim_B", "mv_dim_C"))
+  expect_equal(grid |> count(fixed_decision) |> pull(n), c(2, 2, 2))
+})
+
+test_that("fix_decision filters rows and removes the fixed dimension", {
+  ablated <- fix_decision(make_example_multiverse(), "mv_dim_A", "a1")
+
+  expect_equal(nrow(ablated), 4)
+  expect_false("mv_dim_A" %in% names(ablated))
+  expect_equal(names(ablated), c("mv_dim_B", "mv_dim_C", "accuracy"))
+})
+
+test_that("calc_method_stability compares ablated importance rankings pairwise", {
+  importance_tbl <- tibble(
+    fixed_decision = "mv_dim_A",
+    fixed_option = "a1",
+    target_decision = rep(c("mv_dim_B", "mv_dim_C", "mv_dim_D"), 3),
+    method = rep(c("fanova", "within", "between"), each = 3),
+    importance = c(1, 2, 3, 2, 4, 6, 3, 2, 1)
+  )
+
+  stability <- calc_method_stability(importance_tbl)
+
+  expect_equal(
+    stability |>
+      filter(method_x == "fanova", method_y == "within") |>
+      pull(rank_correlation),
+    1
+  )
+  expect_equal(
+    stability |>
+      filter(method_x == "fanova", method_y == "between") |>
+      pull(rank_correlation),
+    -1
+  )
+  expect_equal(
+    stability |>
+      filter(method_x == "within", method_y == "between") |>
+      pull(rank_correlation),
+    -1
+  )
+})
+
+test_that("option sensitivity summary links baseline importance to option changes", {
+  ablation_tbl <- tibble(
+    fixed_decision = "mv_dim_A",
+    fixed_decision_label = "A",
+    fixed_option = c(rep("a1", 2), rep("a2", 2), rep("a1", 2), rep("a2", 2)),
+    method = c(rep("within", 4), rep("between", 4)),
+    target_decision = rep(c("mv_dim_B", "mv_dim_C"), 4),
+    target_decision_label = rep(c("B", "C"), 4),
+    importance = c(1, 2, 2, 4, 5, 5, 7, 5),
+    n_universes = 4
+  )
+
+  option_pair_changes <- calc_option_pair_changes(ablation_tbl)
+
+  expect_equal(
+    option_pair_changes |>
+      filter(method == "within") |>
+      pull(mean_abs_change),
+    1.5
+  )
+
+  baseline_importance <- tibble(
+    method = c("within", "between"),
+    target_decision = c("mv_dim_A", "mv_dim_A"),
+    target_decision_label = c("A", "A"),
+    importance = c(0.8, 0.2)
+  )
+
+  option_sensitivity <- summarise_option_sensitivity(
+    option_pair_changes,
+    baseline_importance = baseline_importance
+  )
+
+  expect_equal(
+    option_sensitivity |>
+      filter(method == "within") |>
+      pull(baseline_importance),
+    0.8
+  )
+  expect_equal(
+    option_sensitivity |>
+      filter(method == "between") |>
+      pull(mean_pairwise_abs_change),
+    1
+  )
+})
+
+test_that("predictive relationship summary computes within-method association", {
+  option_sensitivity_summary <- tibble(
+    fixed_decision = c("mv_dim_A", "mv_dim_B", "mv_dim_C"),
+    fixed_decision_label = c("A", "B", "C"),
+    method = c("within", "within", "within"),
+    baseline_importance = c(1, 2, 3),
+    mean_pairwise_abs_change = c(2, 4, 6),
+    mean_pairwise_rank_correlation = c(1, 1, 1),
+    n_option_pairs = c(1, 1, 1)
+  )
+
+  predictive_relationship <- summarise_predictive_relationship(option_sensitivity_summary)
+
+  expect_equal(predictive_relationship$association, 1)
+  expect_equal(predictive_relationship$n_decisions, 3)
+})
+
+test_that("vis_method_stability rotates x-axis labels", {
+  method_stability_summary <- tibble(
+    method_x = "within",
+    method_y = "between",
+    fixed_decision = "mv_dim_A",
+    fixed_decision_label = "A",
+    mean_rank_correlation = 0.5
+  )
+
+  plot <- vis_method_stability(method_stability_summary)
+
+  expect_s3_class(plot, "ggplot")
+  expect_equal(plot$theme$axis.text.x$angle, 45)
+  expect_equal(plot$theme$axis.text.x$hjust, 1)
+})
+
+test_that("vis_option_sensitivity toggles regression line and correlation label", {
+  option_sensitivity_summary <- tibble(
+    fixed_decision = c("mv_dim_A", "mv_dim_B", "mv_dim_C"),
+    fixed_decision_label = c("A", "B", "C"),
+    method = c("within", "within", "within"),
+    baseline_importance = c(1, 2, 3),
+    mean_pairwise_abs_change = c(2, 4, 6),
+    mean_pairwise_rank_correlation = c(1, 1, 1),
+    n_option_pairs = c(1, 1, 1)
+  )
+
+  default_plot <- vis_option_sensitivity(option_sensitivity_summary)
+  default_geoms <- vapply(default_plot$layers, function(layer) class(layer$geom)[1], character(1))
+
+  expect_false("GeomSmooth" %in% default_geoms)
+  expect_true("GeomText" %in% default_geoms)
+  expect_equal(default_plot$layers[[3]]$data$label, "rho = 1.00")
+
+  annotated_plot <- vis_option_sensitivity(
+    option_sensitivity_summary,
+    show_regression_line = TRUE,
+    show_correlation = FALSE
+  )
+  annotated_geoms <- vapply(annotated_plot$layers, function(layer) class(layer$geom)[1], character(1))
+
+  expect_true("GeomSmooth" %in% annotated_geoms)
+  expect_false("GeomText" %in% annotated_geoms)
+})
+
+test_that("regression importance aggregates absolute coefficients by decision", {
+  mv <- tidyr::expand_grid(
+    mv_dim_A = c("a1", "a2"),
+    mv_dim_B = c("b1", "b2", "b3")
+  ) |>
+    mutate(
+      outcome = 1 +
+        2 * (mv_dim_A == "a2") -
+        1 * (mv_dim_B == "b2") +
+        3 * (mv_dim_B == "b3") +
+        c(0.0, 0.1, -0.1, 0.05, -0.05, 0.02)
+    )
+
+  reg_importance <- calc_regression_importance(mv, "outcome")
+
+  expect_equal(unname(reg_importance["mv_dim_A"]), 2, tolerance = 0.05)
+  expect_equal(unname(reg_importance["mv_dim_B"]), 4, tolerance = 0.1)
+})
+
+test_that("tidy_importance_methods keeps regression alongside other methods", {
+  importance_tbl <- tidy_importance_methods(
+    list(
+      regression = c(mv_dim_A = 1, mv_dim_B = 2),
+      fanova = c(mv_dim_A = 3, mv_dim_B = 4),
+      within = c(mv_dim_A = 5, mv_dim_B = 6),
+      between = c(mv_dim_A = 7, mv_dim_B = 8)
+    )
+  )
+
+  expect_setequal(
+    unique(importance_tbl$method),
+    c("regression", "fanova", "within", "between")
+  )
+})

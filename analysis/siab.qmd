@@ -111,6 +111,20 @@ vis_observed_vs_predicted(reg_siab, type = "hist", facet = T)
 vis_regression_coefficients(reg_siab)
 ```
 
+### Importance
+
+```{r}
+regimp_siab <- calc_regression_importance(
+  mv_siab,
+  colname_metric = "perf_acc"
+)
+regimp_siab
+```
+
+```{r}
+vis_importance(regimp_siab)
+```
+
 ## FANOVA
 
 ```{r}
@@ -164,6 +178,73 @@ vis_importance_2dim(
 )
 ```
 
+# Ablation Study
+
+Fix each decision to one option, recompute the importance estimates on the
+reduced multiverse, and compare the resulting importance vectors across
+methods and across options of the fixed decision.
+
+```{r}
+ablation_siab <- run_ablation_analysis(
+  mv_siab,
+  colname_metric = "perf_acc"
+)
+```
+
+## Stability across importance methods
+
+The table below shows the baseline agreement between methods on the full
+multiverse, plus the average agreement after fixing each decision and averaging
+over that decision's options.
+
+```{r}
+ablation_siab$method_stability_summary |>
+  mutate(
+    fixed_decision_label = if_else(
+      fixed_decision == "full_multiverse",
+      "full multiverse",
+      fixed_decision_label
+    )
+  ) |>
+  select(
+    fixed_decision_label,
+    method_x,
+    method_y,
+    mean_rank_correlation,
+    min_rank_correlation
+  )
+```
+
+```{r}
+vis_method_stability(ablation_siab$method_stability_summary)
+```
+
+## Does baseline importance predict option-induced change?
+
+For each decision and method, compare the original full-multiverse importance
+of that decision to the mean pairwise change in the ablated importance vectors
+across the different fixed options of that decision.
+
+```{r}
+ablation_siab$option_sensitivity |>
+  arrange(method, desc(baseline_importance)) |>
+  select(
+    fixed_decision_label,
+    method,
+    baseline_importance,
+    mean_pairwise_abs_change,
+    mean_pairwise_rank_correlation
+  )
+```
+
+```{r}
+ablation_siab$predictive_relationship
+```
+
+```{r}
+vis_option_sensitivity(ablation_siab$option_sensitivity)
+```
+
 
 # Decisions
 
@@ -175,4 +256,3 @@ mv_siab |>
     colname_metric = "perf_acc"
   )
 ```
-

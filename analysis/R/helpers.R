@@ -5,3 +5,7 @@ get_multiverse_decisions <- function (mv, dim_prefix = "mv_dim_") {
   names(opts) <- sub(paste0("^", dim_prefix), "", names(opts))
   opts
 }
+
+strip_dim_prefix <- function (x, dim_prefix = "mv_dim_") {
+  sub(paste0("^", dim_prefix), "", x)
+}

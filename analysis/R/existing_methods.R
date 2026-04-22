@@ -63,6 +63,39 @@ calc_regression <- function (mv, colname_metric, dim_prefix = "mv_dim_") {
 
   attr(lm_fitted, "tidy") <- tidy(lm_fitted)
   attr(lm_fitted, "formula") <- formula
+  attr(lm_fitted, "features") <- features
 
   return(lm_fitted)
+}
+
+tidy_regression_coefficients <- function (reg_result, dim_prefix = "mv_dim_") {
+  features <- attr(reg_result, "features")
+
+  match_decision <- function (term) {
+    matches <- features[startsWith(term, features)]
+
+    if (length(matches) == 0) {
+      return(term)
+    }
+
+    matches[which.max(nchar(matches))]
+  }
+
+  attr(reg_result, "tidy") |>
+    filter(term != "(Intercept)") |>
+    mutate(
+      decision = vapply(term, match_decision, character(1)),
+      decision_label = strip_dim_prefix(decision, dim_prefix = dim_prefix),
+      option = substring(term, nchar(decision) + 1),
+      option = if_else(option == "", decision_label, option)
+    )
+}
+
+calc_regression_importance <- function (mv, colname_metric, dim_prefix = "mv_dim_") {
+  calc_regression(mv, colname_metric, dim_prefix = dim_prefix) |>
+    tidy_regression_coefficients(dim_prefix = dim_prefix) |>
+    group_by(decision) |>
+    summarise(importance = sum(abs(estimate)), .groups = "drop") |>
+    arrange(desc(importance)) |>
+    deframe()
 }
