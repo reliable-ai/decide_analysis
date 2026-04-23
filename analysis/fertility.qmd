@@ -164,14 +164,14 @@ ablation_fert <- run_ablation_analysis(
 )
 ```
 
-## Stability across importance methods
+## Inter-method stability
 
 The table below shows the baseline agreement between methods on the full
 multiverse, plus the average agreement after fixing each decision and averaging
 over that decision's options.
 
 ```{r}
-ablation_fert$method_stability_summary |>
+ablation_fert$inter_method_stability_summary |>
   mutate(
     fixed_decision_label = if_else(
       fixed_decision == "full_multiverse",
@@ -189,7 +189,28 @@ ablation_fert$method_stability_summary |>
 ```
 
 ```{r}
-vis_method_stability(ablation_fert$method_stability_summary)
+vis_inter_method_stability(ablation_fert$inter_method_stability_summary)
+```
+
+## Intra-method stability
+
+For each method separately, compare its full-multiverse importance vector to
+the importance vector obtained after fixing one decision to one option, then
+average those correlations over the options of the fixed decision.
+
+```{r}
+ablation_fert$intra_method_stability_summary |>
+  select(
+    fixed_decision_label,
+    method,
+    mean_rank_correlation,
+    min_rank_correlation,
+    mean_abs_difference
+  )
+```
+
+```{r}
+vis_intra_method_stability(ablation_fert$intra_method_stability_summary)
 ```
 
 ## Does baseline importance predict option-induced change?

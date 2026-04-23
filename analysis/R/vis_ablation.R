@@ -1,5 +1,24 @@
-vis_method_stability <- function (method_stability_summary, baseline_label = "full multiverse") {
-  method_stability_summary |>
+add_stability_average_row <- function (stability_summary,
+                                       group_cols,
+                                       average_label = "Average") {
+  bind_rows(
+    stability_summary,
+    stability_summary |>
+      group_by(across(all_of(group_cols))) |>
+      summarise(
+        fixed_decision = "overall_average",
+        fixed_decision_label = average_label,
+        mean_rank_correlation = safe_mean(mean_rank_correlation),
+        .groups = "drop"
+      )
+  )
+}
+
+vis_inter_method_stability <- function (inter_method_stability_summary,
+                                        baseline_label = "full multiverse",
+                                        show_values = TRUE,
+                                        add_average = TRUE) {
+  plot_data <- inter_method_stability_summary |>
     mutate(
       comparison = paste(method_x, "vs", method_y),
       fixed_decision_label = if_else(
@@ -7,14 +26,102 @@ vis_method_stability <- function (method_stability_summary, baseline_label = "fu
         baseline_label,
         fixed_decision_label
       )
-    ) |>
-    ggplot(aes(x = comparison, y = fct_reorder(fixed_decision_label, mean_rank_correlation), fill = mean_rank_correlation)) +
+    )
+
+  if (add_average) {
+    plot_data <- add_stability_average_row(plot_data, group_cols = "comparison")
+  }
+
+  decision_order <- plot_data |>
+    filter(fixed_decision_label != "Average") |>
+    group_by(fixed_decision_label) |>
+    summarise(order_value = safe_mean(mean_rank_correlation), .groups = "drop") |>
+    arrange(order_value) |>
+    pull(fixed_decision_label)
+
+  if (add_average) {
+    decision_order <- c("Average", decision_order)
+  }
+
+  plot_data <- plot_data |>
+    mutate(
+      fixed_decision_label = factor(fixed_decision_label, levels = unique(decision_order)),
+      correlation_label = if_else(
+        is.na(mean_rank_correlation),
+        "NA",
+        formatC(mean_rank_correlation, digits = 2, format = "f")
+      )
+    )
+
+  plot <- ggplot(
+    plot_data,
+    aes(x = comparison, y = fixed_decision_label, fill = mean_rank_correlation)
+  ) +
     geom_tile() +
     scale_fill_viridis_c(limits = c(-1, 1)) +
     labs(x = NULL, y = NULL, fill = "Mean rank\ncorrelation") +
     theme_classic() +
     theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+  if (show_values) {
+    plot <- plot + geom_text(aes(label = correlation_label), size = 3)
+  }
+
+  plot
 }
+
+vis_intra_method_stability <- function (intra_method_stability_summary,
+                                        show_values = TRUE,
+                                        add_average = TRUE) {
+  plot_data <- intra_method_stability_summary
+
+  if (add_average) {
+    plot_data <- add_stability_average_row(plot_data, group_cols = "method")
+  }
+
+  decision_order <- plot_data |>
+    filter(fixed_decision_label != "Average") |>
+    group_by(fixed_decision_label) |>
+    summarise(order_value = safe_mean(mean_rank_correlation), .groups = "drop") |>
+    arrange(order_value) |>
+    pull(fixed_decision_label)
+
+  if (add_average) {
+    decision_order <- c("Average", decision_order)
+  }
+
+  plot_data <- plot_data |>
+    mutate(
+      fixed_decision_label = factor(fixed_decision_label, levels = unique(decision_order)),
+      correlation_label = if_else(
+        is.na(mean_rank_correlation),
+        "NA",
+        formatC(mean_rank_correlation, digits = 2, format = "f")
+      )
+    )
+
+  plot <- ggplot(
+    plot_data,
+    aes(
+      x = method,
+      y = fixed_decision_label,
+      fill = mean_rank_correlation
+    )
+  ) +
+    geom_tile() +
+    scale_fill_viridis_c(limits = c(-1, 1)) +
+    labs(x = NULL, y = NULL, fill = "Mean rank\ncorrelation") +
+    theme_classic() +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+  if (show_values) {
+    plot <- plot + geom_text(aes(label = correlation_label), size = 3)
+  }
+
+  plot
+}
+
+vis_method_stability <- vis_inter_method_stability
 
 vis_option_sensitivity <- function (option_sensitivity_summary,
                                     show_regression_line = FALSE,
