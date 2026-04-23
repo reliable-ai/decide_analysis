@@ -10,7 +10,7 @@ suppressPackageStartupMessages({
 
 # Load all scripts in the R directory, which do *not* start with a `_`
 lapply(
-  list.files(path = "R/", pattern = "^[^_].*\\.R$", full.names = TRUE),
+  list.files(path = here::here("R/"), pattern = "^[^_].*\\.R$", full.names = TRUE),
   source
 )
 
