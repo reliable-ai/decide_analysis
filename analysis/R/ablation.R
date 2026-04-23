@@ -119,6 +119,10 @@ calc_ablation_importance <- function (mv, colname_metric, dim_prefix = "mv_dim_"
   )
 }
 
+# Compares importance rankings between every pair of methods.
+# For each (fixed_decision, fixed_option), it correlates method-specific
+# importance vectors across target decisions after pivoting to wide format.
+# The reported rank_correlation is Spearman by default.
 calc_method_stability <- function (importance_tbl, cor_method = "spearman") {
   methods <- unique(importance_tbl$method)
   method_pairs <- combn(methods, 2, simplify = FALSE)
@@ -165,11 +169,15 @@ summarise_method_stability <- function (method_stability_tbl, dim_prefix = "mv_d
     )
 }
 
+# Quantifies how much a method changes when switching between options of the
+# same fixed decision. For each option pair, it correlates the two option-
+# specific importance vectors across target decisions (Spearman by default).
 calc_option_pair_changes <- function (ablation_tbl, cor_method = "spearman") {
   ablation_tbl |>
     group_by(fixed_decision, method) |>
     group_modify(
       ~ {
+        # Compare every pair of options for this (fixed_decision, method) slice.
         options <- unique(.x$fixed_option)
         option_pairs <- combn(options, 2, simplify = FALSE)
 
@@ -180,6 +188,8 @@ calc_option_pair_changes <- function (ablation_tbl, cor_method = "spearman") {
         purrr::map_dfr(
           option_pairs,
           function (option_pair) {
+            # Align both options by target_decision so pairwise deltas/correlations
+            # are computed on matched importance entries.
             wide <- .x |>
               filter(fixed_option %in% option_pair) |>
               select(fixed_option, target_decision, importance) |>
@@ -209,8 +219,12 @@ calc_option_pair_changes <- function (ablation_tbl, cor_method = "spearman") {
     ungroup()
 }
 
+# Aggregates pairwise option-change statistics per decision and method, then
+# joins baseline self-importance (importance of decision d on itself in the
+# full multiverse) to support downstream association analyses.
 summarise_option_sensitivity <- function (option_pair_changes, baseline_importance,
                                           dim_prefix = "mv_dim_") {
+  # Keep only each method's self-importance for decision d (d -> d) in baseline.
   baseline_self <- baseline_importance |>
     select(method, target_decision, importance) |>
     rename(
@@ -219,6 +233,7 @@ summarise_option_sensitivity <- function (option_pair_changes, baseline_importan
     )
 
   option_pair_changes |>
+    # Average over all option pairs for each decision and method.
     group_by(fixed_decision, method) |>
     summarise(
       mean_pairwise_abs_change = safe_mean(mean_abs_change),
@@ -226,6 +241,7 @@ summarise_option_sensitivity <- function (option_pair_changes, baseline_importan
       n_option_pairs = n(),
       .groups = "drop"
     ) |>
+    # Join baseline self-importance so we can compare "importance" vs "sensitivity".
     left_join(baseline_self, by = c("fixed_decision", "method")) |>
     mutate(
       fixed_decision_label = strip_dim_prefix(fixed_decision, dim_prefix = dim_prefix)
@@ -241,6 +257,9 @@ summarise_option_sensitivity <- function (option_pair_changes, baseline_importan
     )
 }
 
+# Tests whether decisions that look important in the full multiverse are also
+# the ones that are more sensitive to option changes.
+# Correlation is computed across decisions within each method.
 summarise_predictive_relationship <- function (option_sensitivity_summary,
                                                cor_method = "spearman") {
   option_sensitivity_summary |>
@@ -256,18 +275,28 @@ summarise_predictive_relationship <- function (option_sensitivity_summary,
     )
 }
 
+# End-to-end ablation pipeline:
+# 1) compute baseline importance on the full multiverse,
+# 2) recompute importance after fixing each decision to each option,
+# 3) compare methods within each ablated setting,
+# 4) summarize how option changes alter importance,
+# 5) correlate baseline importance with option sensitivity.
 run_ablation_analysis <- function (mv, colname_metric, dim_prefix = "mv_dim_") {
+  # Baseline: importances computed on the full multiverse (no fixed decision).
   baseline_importance <- tidy_importance_methods(
     calc_importance_methods(mv, colname_metric = colname_metric, dim_prefix = dim_prefix),
     dim_prefix = dim_prefix
   )
 
+  # Ablation: re-estimate importances after fixing each decision to each option.
   ablation_importance <- calc_ablation_importance(
     mv,
     colname_metric = colname_metric,
     dim_prefix = dim_prefix
   )
 
+  # Add the full-multiverse baseline as a reference pseudo-setting so method
+  # agreement is directly comparable to ablated settings.
   method_stability <- bind_rows(
     baseline_importance |>
       mutate(
@@ -290,6 +319,7 @@ run_ablation_analysis <- function (mv, colname_metric, dim_prefix = "mv_dim_") {
   ) |>
     calc_method_stability()
 
+  # Option-level perturbation diagnostics and summary statistics.
   option_pair_changes <- calc_option_pair_changes(ablation_importance)
   option_sensitivity <- summarise_option_sensitivity(
     option_pair_changes,
