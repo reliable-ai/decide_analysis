@@ -126,7 +126,35 @@ vis_method_stability <- vis_inter_method_stability
 vis_option_sensitivity <- function (option_sensitivity_summary,
                                     show_regression_line = FALSE,
                                     show_correlation = TRUE) {
-  plot <- option_sensitivity_summary |>
+  plot_data <- option_sensitivity_summary
+
+  if (show_correlation) {
+    plot_data <- plot_data |>
+      left_join(
+        summarise_predictive_relationship(
+          option_sensitivity_summary,
+          method = "pearson"
+        ) |>
+          mutate(
+            method_label = paste0(
+              method,
+              "\n",
+              if_else(
+                is.na(association),
+                "r = NA",
+                paste0("r = ", formatC(association, digits = 2, format = "f"))
+              )
+            )
+          ) |>
+          select(method, method_label),
+        by = "method"
+      )
+  } else {
+    plot_data <- plot_data |>
+      mutate(method_label = method)
+  }
+
+  plot <- plot_data |>
     ggplot(aes(
       x = baseline_importance,
       y = mean_pairwise_abs_change,
@@ -134,7 +162,7 @@ vis_option_sensitivity <- function (option_sensitivity_summary,
     )) +
     geom_point() +
     ggrepel::geom_text_repel() +
-    facet_wrap(vars(method), scales = "free") +
+    facet_wrap(vars(method_label), scales = "free") +
     labs(
       x = "Baseline importance of fixed decision",
       y = "Mean pairwise change across fixed options"
@@ -144,28 +172,6 @@ vis_option_sensitivity <- function (option_sensitivity_summary,
   if (show_regression_line) {
     plot <- plot +
       geom_smooth(method = "lm", se = FALSE, colour = "grey50")
-  }
-
-  if (show_correlation) {
-    correlation_labels <- summarise_predictive_relationship(option_sensitivity_summary) |>
-      mutate(
-        label = if_else(
-          is.na(association),
-          "rho = NA",
-          paste0("rho = ", formatC(association, digits = 2, format = "f"))
-        ),
-        x = Inf,
-        y = -Inf
-      )
-
-    plot <- plot +
-      geom_text(
-        data = correlation_labels,
-        aes(x = x, y = y, label = label),
-        hjust = 1.1,
-        vjust = -0.5,
-        inherit.aes = FALSE
-      )
   }
 
   plot
