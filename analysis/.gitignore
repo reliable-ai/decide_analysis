@@ -1,2 +1,8 @@
 /.quarto/
 **/*.quarto_ipynb
+*.tex
+*.aux
+*.toc
+*.fdb_latexmk
+*.fls
+*.synctex.gz

@@ -1,5 +1,9 @@
 project:
   title: "default"
 
+format:
+  pdf:
+    keep-tex: true
+
 
 
