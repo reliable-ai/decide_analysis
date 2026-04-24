@@ -238,5 +238,7 @@ ablation_hurr$predictive_relationship
 ```
 
 ```{r hurricane-ablation-option-sensitivity-plot}
+#| fig-width: 8
+#| fig-height: 7.5
 vis_option_sensitivity(ablation_hurr$option_sensitivity)
 ```

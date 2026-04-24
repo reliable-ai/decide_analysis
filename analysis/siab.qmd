@@ -263,6 +263,8 @@ ablation_siab$predictive_relationship
 ```
 
 ```{r siab-ablation-option-sensitivity-plot}
+#| fig-width: 8
+#| fig-height: 7.5
 vis_option_sensitivity(ablation_siab$option_sensitivity)
 ```
 
