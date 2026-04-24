@@ -133,7 +133,7 @@ vis_option_sensitivity <- function (option_sensitivity_summary,
       left_join(
         summarise_predictive_relationship(
           option_sensitivity_summary,
-          method = "pearson"
+          cor_method = "pearson"
         ) |>
           mutate(
             method_label = paste0(
