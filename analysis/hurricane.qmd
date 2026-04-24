@@ -7,19 +7,19 @@ format: pdf
 source("R/_load.R")
 ```
 
-```{r}
+```{r hurricane-load-data}
 mv_hurr <- load_multiverse("hurricane")
 mv_hurr
 ```
 
 # Overview
 
-```{r}
+```{r hurricane-decisions-overview}
 mv_hurr |>
   get_multiverse_decisions()
 ```
 
-```{r}
+```{r hurricane-multiverse-simple}
 #| fig-width: 10
 vis_multiverse_simple(mv_hurr, direction = "right")
 ```
@@ -28,14 +28,14 @@ vis_multiverse_simple(mv_hurr, direction = "right")
 
 ## Regression
 
-```{r}
+```{r hurricane-regression-fit}
 reg_hurr <- calc_regression(mv_hurr, colname_metric = "expected_deaths_diff")
 attr(reg_hurr, "tidy")
 ```
 
 ### Performance
 
-```{r}
+```{r hurricane-regression-performance}
 reg_hurr |> 
   model_performance()
 ```
@@ -43,7 +43,7 @@ reg_hurr |>
 
 ### Model Fit
 
-```{r}
+```{r hurricane-regression-model-check}
 #| fig-width: 9
 #| fig-height: 12
 # All-in-one model checks
@@ -53,26 +53,26 @@ reg_hurr |>
 
 Posterior predictive check comparing simulated data from the model to actual observed data. Uses R's `simulate()` function on the lm.
 
-```{r}
+```{r hurricane-regression-pred-check}
 reg_hurr |> 
   check_predictions()
 ```
 
 
-```{r}
+```{r hurricane-regression-residuals-fitted}
 vis_residuals_vs_fitted(reg_hurr)
 ```
 
-```{r}
+```{r hurricane-regression-observed-predicted}
 vis_observed_vs_predicted(reg_hurr)
 ```
 
-```{r}
+```{r hurricane-regression-observed-predicted-kde}
 vis_observed_vs_predicted(reg_hurr, type = "kde")
 ```
 
 
-```{r}
+```{r hurricane-regression-observed-predicted-hist}
 #| fig-height: 3
 #| fig-width: 7
 vis_observed_vs_predicted(reg_hurr, type = "hist", facet = T)
@@ -80,13 +80,13 @@ vis_observed_vs_predicted(reg_hurr, type = "hist", facet = T)
 
 ### Coefficients
 
-```{r}
+```{r hurricane-regression-coefficients}
 vis_regression_coefficients(reg_hurr)
 ```
 
 ### Importance
 
-```{r}
+```{r hurricane-regression-importance}
 regimp_hurr <- calc_regression_importance(
   mv_hurr,
   colname_metric = "expected_deaths_diff"
@@ -94,18 +94,18 @@ regimp_hurr <- calc_regression_importance(
 regimp_hurr
 ```
 
-```{r}
+```{r hurricane-regression-importance-plot}
 vis_importance(regimp_hurr)
 ```
 
 ## FANOVA
 
-```{r}
+```{r hurricane-fanova-fit}
 fanova_hurr <- calc_fanova(mv_hurr, colname_metric = "expected_deaths_diff")
 fanova_hurr
 ```
 
-```{r}
+```{r hurricane-fanova-importance-plot}
 fanova_hurr |>
   head(10) |> 
   fanova_to_vec() |> 
@@ -114,7 +114,7 @@ fanova_hurr |>
 
 Only main effects
 
-```{r}
+```{r hurricane-fanova-main-effects-plot}
 fanova_hurr |>
   filter(is.na(level_1)) |>
   head(10) |> 
@@ -125,28 +125,28 @@ fanova_hurr |>
 
 # Our Framework
 
-```{r}
+```{r hurricane-within-bucket}
 within_hurr <- calc_within_bucket_variation(mv_hurr, colname_metric = "expected_deaths_diff")
 within_hurr
 ```
 
-```{r}
+```{r hurricane-within-bucket-plot}
 vis_importance(within_hurr)
 ```
 
-```{r}
+```{r hurricane-between-bucket}
 between_hurr <- calc_between_bucket_variation(mv_hurr, colname_metric = "expected_deaths_diff")
 between_hurr
 ```
 
-```{r}
+```{r hurricane-between-bucket-plot}
 # NA leads to problem
 vis_importance(between_hurr)
 ```
 
 ## Combine
 
-```{r}
+```{r hurricane-combine-importance}
 vis_importance_2dim(
   between_hurr,
   fanova_hurr |> fanova_to_vec()
@@ -159,7 +159,7 @@ Fix each decision to one option, recompute the importance estimates on the
 reduced multiverse, and compare the resulting importance vectors across
 methods and across options of the fixed decision.
 
-```{r}
+```{r hurricane-ablation-run}
 ablation_hurr <- run_ablation_analysis(
   mv_hurr,
   colname_metric = "expected_deaths_diff"
@@ -172,7 +172,7 @@ The table below shows the baseline agreement between methods on the full
 multiverse, plus the average agreement after fixing each decision and averaging
 over that decision's options.
 
-```{r}
+```{r hurricane-ablation-inter-method-table}
 ablation_hurr$inter_method_stability_summary |>
   mutate(
     fixed_decision_label = if_else(
@@ -190,7 +190,7 @@ ablation_hurr$inter_method_stability_summary |>
   )
 ```
 
-```{r}
+```{r hurricane-ablation-inter-method-plot}
 vis_inter_method_stability(ablation_hurr$inter_method_stability_summary)
 ```
 
@@ -200,7 +200,7 @@ For each method separately, compare its full-multiverse importance vector to
 the importance vector obtained after fixing one decision to one option, then
 average those correlations over the options of the fixed decision.
 
-```{r}
+```{r hurricane-ablation-intra-method-table}
 ablation_hurr$intra_method_stability_summary |>
   select(
     fixed_decision_label,
@@ -211,7 +211,7 @@ ablation_hurr$intra_method_stability_summary |>
   )
 ```
 
-```{r}
+```{r hurricane-ablation-intra-method-plot}
 vis_intra_method_stability(ablation_hurr$intra_method_stability_summary)
 ```
 
@@ -221,7 +221,7 @@ For each decision and method, compare the original full-multiverse importance
 of that decision to the mean pairwise change in the ablated importance vectors
 across the different fixed options of that decision.
 
-```{r}
+```{r hurricane-ablation-option-sensitivity-table}
 ablation_hurr$option_sensitivity |>
   arrange(method, desc(baseline_importance)) |>
   select(
@@ -233,10 +233,10 @@ ablation_hurr$option_sensitivity |>
   )
 ```
 
-```{r}
+```{r hurricane-ablation-predictive-relationship}
 ablation_hurr$predictive_relationship
 ```
 
-```{r}
+```{r hurricane-ablation-option-sensitivity-plot}
 vis_option_sensitivity(ablation_hurr$option_sensitivity)
 ```

@@ -7,7 +7,7 @@ format: pdf
 source("R/_load.R")
 ```
 
-```{r}
+```{r siab-load-data}
 mv_siab_org <- load_multiverse("siab_jan")
 mv_siab_org
 ```
@@ -16,13 +16,13 @@ mv_siab_org
 
 There are a handful of decisions with only a single option, let's drop these to not throw off any of the algorithms.
 
-```{r}
+```{r siab-single-option-decisions}
 mv_siab_org |>
   get_multiverse_decisions()
 ```
 
 
-```{r}
+```{r siab-remove-fake-decisions}
 mv_siab <- mv_siab_org |> 
   remove_fake_decisions()
 mv_siab
@@ -30,25 +30,25 @@ mv_siab
 
 # Overview
 
-```{r}
+```{r siab-decisions-overview}
 mv_siab |>
   get_multiverse_decisions()
 ```
 
-```{r}
+```{r siab-multiverse-simple-down}
 #| fig-width: 6
 #| fig-height: 10
 vis_multiverse_simple(mv_siab, direction = "down")
 ```
 
 
-```{r}
+```{r siab-multiverse-simple-right}
 #| fig-width: 11
 #| fig-height: 4
 vis_multiverse_simple(mv_siab, direction = "right", decision_label_pos = 0, decision_label_angle = -7, option_label_offset_x = 0.1)
 ```
 
-```{r}
+```{r siab-performance-hist}
 mv_siab |> 
   ggplot() +
   aes(x = perf_acc) +
@@ -60,21 +60,21 @@ mv_siab |>
 
 ## Regression
 
-```{r}
+```{r siab-regression-fit}
 reg_siab <- calc_regression(mv_siab, colname_metric = "perf_acc")
 attr(reg_siab, "tidy")
 ```
 
 ### Performance
 
-```{r}
+```{r siab-regression-performance}
 reg_siab |>
   model_performance()
 ```
 
 ### Model Fit
 
-```{r}
+```{r siab-regression-model-check}
 #| fig-width: 9
 #| fig-height: 12
 # All-in-one model checks
@@ -84,36 +84,36 @@ reg_siab |>
 
 Posterior predictive check comparing simulated data from the model to actual observed data. Uses R's `simulate()` function on the lm.
 
-```{r}
+```{r siab-regression-pred-check}
 reg_siab |>
   check_predictions()
 ```
 
-```{r}
+```{r siab-regression-residuals-fitted}
 vis_residuals_vs_fitted(reg_siab)
 ```
 
-```{r}
+```{r siab-regression-observed-predicted}
 vis_observed_vs_predicted(reg_siab)
 ```
 
-```{r}
+```{r siab-regression-observed-predicted-kde}
 vis_observed_vs_predicted(reg_siab, type = "kde")
 ```
 
-```{r}
+```{r siab-regression-observed-predicted-hist}
 #| fig-height: 3
 #| fig-width: 7
 vis_observed_vs_predicted(reg_siab, type = "hist", facet = T)
 ```
 
-```{r}
+```{r siab-regression-coefficients}
 vis_regression_coefficients(reg_siab)
 ```
 
 ### Importance
 
-```{r}
+```{r siab-regression-importance}
 regimp_siab <- calc_regression_importance(
   mv_siab,
   colname_metric = "perf_acc"
@@ -121,18 +121,18 @@ regimp_siab <- calc_regression_importance(
 regimp_siab
 ```
 
-```{r}
+```{r siab-regression-importance-plot}
 vis_importance(regimp_siab)
 ```
 
 ## FANOVA
 
-```{r}
+```{r siab-fanova-fit}
 fanova_siab <- calc_fanova(mv_siab, colname_metric = "perf_acc")
 fanova_siab
 ```
 
-```{r}
+```{r siab-fanova-importance-plot}
 fanova_siab |>
   head(10) |> 
   fanova_to_vec() |> 
@@ -141,7 +141,7 @@ fanova_siab |>
 
 Only main effects
 
-```{r}
+```{r siab-fanova-main-effects-plot}
 fanova_siab |>
   filter(is.na(level_1)) |>
   head(10) |> 
@@ -151,27 +151,27 @@ fanova_siab |>
 
 # Our Framework
 
-```{r}
+```{r siab-within-bucket}
 within_siab <- calc_within_bucket_variation(mv_siab, colname_metric = "perf_acc")
 within_siab
 ```
 
-```{r}
+```{r siab-within-bucket-plot}
 vis_importance(within_siab)
 ```
 
-```{r}
+```{r siab-between-bucket}
 between_siab <- calc_between_bucket_variation(mv_siab, colname_metric = "perf_acc")
 between_siab
 ```
 
-```{r}
+```{r siab-between-bucket-plot}
 vis_importance(between_siab)
 ```
 
 ## Combine
 
-```{r}
+```{r siab-combine-importance}
 vis_importance_2dim(
   between_siab,
   fanova_siab |> fanova_to_vec()
@@ -184,7 +184,7 @@ Fix each decision to one option, recompute the importance estimates on the
 reduced multiverse, and compare the resulting importance vectors across
 methods and across options of the fixed decision.
 
-```{r}
+```{r siab-ablation-run}
 ablation_siab <- run_ablation_analysis(
   mv_siab,
   colname_metric = "perf_acc"
@@ -197,7 +197,7 @@ The table below shows the baseline agreement between methods on the full
 multiverse, plus the average agreement after fixing each decision and averaging
 over that decision's options.
 
-```{r}
+```{r siab-ablation-inter-method-table}
 ablation_siab$inter_method_stability_summary |>
   mutate(
     fixed_decision_label = if_else(
@@ -215,7 +215,7 @@ ablation_siab$inter_method_stability_summary |>
   )
 ```
 
-```{r}
+```{r siab-ablation-inter-method-plot}
 vis_inter_method_stability(ablation_siab$inter_method_stability_summary)
 ```
 
@@ -225,7 +225,7 @@ For each method separately, compare its full-multiverse importance vector to
 the importance vector obtained after fixing one decision to one option, then
 average those correlations over the options of the fixed decision.
 
-```{r}
+```{r siab-ablation-intra-method-table}
 ablation_siab$intra_method_stability_summary |>
   select(
     fixed_decision_label,
@@ -236,7 +236,7 @@ ablation_siab$intra_method_stability_summary |>
   )
 ```
 
-```{r}
+```{r siab-ablation-intra-method-plot}
 vis_intra_method_stability(ablation_siab$intra_method_stability_summary)
 ```
 
@@ -246,7 +246,7 @@ For each decision and method, compare the original full-multiverse importance
 of that decision to the mean pairwise change in the ablated importance vectors
 across the different fixed options of that decision.
 
-```{r}
+```{r siab-ablation-option-sensitivity-table}
 ablation_siab$option_sensitivity |>
   arrange(method, desc(baseline_importance)) |>
   select(
@@ -258,18 +258,18 @@ ablation_siab$option_sensitivity |>
   )
 ```
 
-```{r}
+```{r siab-ablation-predictive-relationship}
 ablation_siab$predictive_relationship
 ```
 
-```{r}
+```{r siab-ablation-option-sensitivity-plot}
 vis_option_sensitivity(ablation_siab$option_sensitivity)
 ```
 
 
 # Decisions
 
-```{r}
+```{r siab-decision-model}
 mv_siab |> 
   vis_decision(
     mv_dim_model,

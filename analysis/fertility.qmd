@@ -7,24 +7,24 @@ format: pdf
 source("R/_load.R")
 ```
 
-```{r}
+```{r fertility-load-data}
 mv_fert <- load_multiverse("fertility")
 mv_fert
 ```
 
 # Overview
 
-```{r}
+```{r fertility-decisions-overview}
 mv_fert |>
   get_multiverse_decisions()
 ```
 
-```{r}
+```{r fertility-multiverse-tree}
 #| fig-width: 11
 vis_multiverse_tree(mv_fert)
 ```
 
-```{r}
+```{r fertility-multiverse-simple}
 #| fig-width: 9
 vis_multiverse_simple(mv_fert, direction = "right")
 ```
@@ -33,21 +33,21 @@ vis_multiverse_simple(mv_fert, direction = "right")
 
 ## Regression
 
-```{r}
+```{r fertility-regression-fit}
 reg_fert <- calc_regression(mv_fert, colname_metric = "fertility_low_estimate")
 attr(reg_fert, "tidy")
 ```
 
 ### Performance
 
-```{r}
+```{r fertility-regression-performance}
 reg_fert |>
   model_performance()
 ```
 
 ### Model Fit
 
-```{r}
+```{r fertility-regression-model-check}
 #| fig-width: 9
 #| fig-height: 12
 # All-in-one model checks
@@ -57,36 +57,36 @@ reg_fert |>
 
 Posterior predictive check comparing simulated data from the model to actual observed data. Uses R's `simulate()` function on the lm.
 
-```{r}
+```{r fertility-regression-pred-check}
 reg_fert |>
   check_predictions()
 ```
 
-```{r}
+```{r fertility-regression-residuals-fitted}
 vis_residuals_vs_fitted(reg_fert)
 ```
 
-```{r}
+```{r fertility-regression-observed-predicted}
 vis_observed_vs_predicted(reg_fert)
 ```
 
-```{r}
+```{r fertility-regression-observed-predicted-kde}
 vis_observed_vs_predicted(reg_fert, type = "kde")
 ```
 
-```{r}
+```{r fertility-regression-observed-predicted-hist}
 #| fig-height: 3
 #| fig-width: 7
 vis_observed_vs_predicted(reg_fert, type = "hist", facet = T)
 ```
 
-```{r}
+```{r fertility-regression-coefficients}
 vis_regression_coefficients(reg_fert)
 ```
 
 ### Importance
 
-```{r}
+```{r fertility-regression-importance}
 regimp_fert <- calc_regression_importance(
   mv_fert,
   colname_metric = "fertility_low_estimate"
@@ -94,18 +94,18 @@ regimp_fert <- calc_regression_importance(
 regimp_fert
 ```
 
-```{r}
+```{r fertility-regression-importance-plot}
 vis_importance(regimp_fert)
 ```
 
 ## FANOVA
 
-```{r}
+```{r fertility-fanova-fit}
 fanova_fert <- calc_fanova(mv_fert, colname_metric = "fertility_low_estimate")
 fanova_fert
 ```
 
-```{r}
+```{r fertility-fanova-importance-plot}
 fanova_fert |>
   head(10) |> 
   fanova_to_vec() |> 
@@ -114,7 +114,7 @@ fanova_fert |>
 
 Only main effects
 
-```{r}
+```{r fertility-fanova-main-effects-plot}
 fanova_fert |>
   filter(is.na(level_1)) |>
   head(10) |> 
@@ -124,27 +124,27 @@ fanova_fert |>
 
 # Our Framework
 
-```{r}
+```{r fertility-within-bucket}
 within_fert <- calc_within_bucket_variation(mv_fert, colname_metric = "fertility_low_estimate")
 within_fert
 ```
 
-```{r}
+```{r fertility-within-bucket-plot}
 vis_importance(within_fert)
 ```
 
-```{r}
+```{r fertility-between-bucket}
 between_fert <- calc_between_bucket_variation(mv_fert, colname_metric = "fertility_low_estimate")
 between_fert
 ```
 
-```{r}
+```{r fertility-between-bucket-plot}
 vis_importance(between_fert)
 ```
 
 ## Combine
 
-```{r}
+```{r fertility-combine-importance}
 vis_importance_2dim(
   between_fert,
   fanova_fert |> fanova_to_vec()
@@ -157,7 +157,7 @@ Fix each decision to one option, recompute the importance estimates on the
 reduced multiverse, and compare the resulting importance vectors across
 methods and across options of the fixed decision.
 
-```{r}
+```{r fertility-ablation-run}
 ablation_fert <- run_ablation_analysis(
   mv_fert,
   colname_metric = "fertility_low_estimate"
@@ -170,7 +170,7 @@ The table below shows the baseline agreement between methods on the full
 multiverse, plus the average agreement after fixing each decision and averaging
 over that decision's options.
 
-```{r}
+```{r fertility-ablation-inter-method-table}
 ablation_fert$inter_method_stability_summary |>
   mutate(
     fixed_decision_label = if_else(
@@ -188,7 +188,7 @@ ablation_fert$inter_method_stability_summary |>
   )
 ```
 
-```{r}
+```{r fertility-ablation-inter-method-plot}
 vis_inter_method_stability(ablation_fert$inter_method_stability_summary)
 ```
 
@@ -198,7 +198,7 @@ For each method separately, compare its full-multiverse importance vector to
 the importance vector obtained after fixing one decision to one option, then
 average those correlations over the options of the fixed decision.
 
-```{r}
+```{r fertility-ablation-intra-method-table}
 ablation_fert$intra_method_stability_summary |>
   select(
     fixed_decision_label,
@@ -209,7 +209,7 @@ ablation_fert$intra_method_stability_summary |>
   )
 ```
 
-```{r}
+```{r fertility-ablation-intra-method-plot}
 vis_intra_method_stability(ablation_fert$intra_method_stability_summary)
 ```
 
@@ -219,7 +219,7 @@ For each decision and method, compare the original full-multiverse importance
 of that decision to the mean pairwise change in the ablated importance vectors
 across the different fixed options of that decision.
 
-```{r}
+```{r fertility-ablation-option-sensitivity-table}
 ablation_fert$option_sensitivity |>
   arrange(method, desc(baseline_importance)) |>
   select(
@@ -231,11 +231,11 @@ ablation_fert$option_sensitivity |>
   )
 ```
 
-```{r}
+```{r fertility-ablation-predictive-relationship}
 ablation_fert$predictive_relationship
 ```
 
-```{r}
+```{r fertility-ablation-option-sensitivity-plot}
 vis_option_sensitivity(ablation_fert$option_sensitivity)
 ```
 
@@ -243,7 +243,7 @@ vis_option_sensitivity(ablation_fert$option_sensitivity)
 
 For relationship_status options 1 and 2 we observe perfect overlap.
 
-```{r}
+```{r fertility-decision-relationship-status}
 mv_fert |> 
   vis_decision(
     mv_dim_relationship_status,
@@ -251,7 +251,7 @@ mv_fert |>
     colname_metric = "fertility_low_estimate"
   )
 ```
-```{r}
+```{r fertility-decision-relationship-status-facet}
 mv_fert |> 
   vis_decision(
     mv_dim_relationship_status,
@@ -261,7 +261,7 @@ mv_fert |>
   )
 ```
 
-```{r}
+```{r fertility-decision-fertile-facet}
 mv_fert |> 
   vis_decision(
     mv_dim_fertile,
@@ -272,7 +272,7 @@ mv_fert |>
 ```
 
 
-```{r}
+```{r fertility-two-decisions-fertile-menstrual}
 mv_fert |> 
   vis_two_decisions(
     mv_dim_fertile,
