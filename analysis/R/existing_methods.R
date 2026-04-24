@@ -95,7 +95,8 @@ calc_regression_importance <- function (mv, colname_metric, dim_prefix = "mv_dim
   calc_regression(mv, colname_metric, dim_prefix = dim_prefix) |>
     tidy_regression_coefficients(dim_prefix = dim_prefix) |>
     group_by(decision) |>
-    summarise(importance = sum(abs(estimate)), .groups = "drop") |>
+    # One might argue for sum, mean or max here
+    summarise(importance = mean(abs(estimate)), .groups = "drop") |>
     arrange(desc(importance)) |>
     deframe()
 }
