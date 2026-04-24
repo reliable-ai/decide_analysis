@@ -277,7 +277,7 @@ test_that("vis_intra_method_stability can show values and add averages", {
   )
 })
 
-test_that("vis_option_sensitivity toggles regression line and correlation label", {
+test_that("vis_option_sensitivity toggles regression line and facet correlation label", {
   option_sensitivity_summary <- tibble(
     fixed_decision = c("mv_dim_A", "mv_dim_B", "mv_dim_C"),
     fixed_decision_label = c("A", "B", "C"),
@@ -292,8 +292,8 @@ test_that("vis_option_sensitivity toggles regression line and correlation label"
   default_geoms <- vapply(default_plot$layers, function(layer) class(layer$geom)[1], character(1))
 
   expect_false("GeomSmooth" %in% default_geoms)
-  expect_true("GeomText" %in% default_geoms)
-  expect_equal(default_plot$layers[[3]]$data$label, "rho = 1.00")
+  expect_false("GeomText" %in% default_geoms)
+  expect_equal(unique(default_plot$data$method_label), "within\nrho = 1.00")
 
   annotated_plot <- vis_option_sensitivity(
     option_sensitivity_summary,
@@ -304,6 +304,7 @@ test_that("vis_option_sensitivity toggles regression line and correlation label"
 
   expect_true("GeomSmooth" %in% annotated_geoms)
   expect_false("GeomText" %in% annotated_geoms)
+  expect_equal(unique(annotated_plot$data$method_label), "within")
 })
 
 test_that("regression importance aggregates absolute coefficients by decision", {

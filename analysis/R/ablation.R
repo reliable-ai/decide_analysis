@@ -305,7 +305,7 @@ summarise_option_sensitivity <- function (option_pair_changes, baseline_importan
 # the ones that are more sensitive to option changes.
 # Correlation is computed across decisions within each method.
 summarise_predictive_relationship <- function (option_sensitivity_summary,
-                                               cor_method = "spearman") {
+                                               cor_method = "pearson") {
   option_sensitivity_summary |>
     group_by(method) |>
     summarise(
