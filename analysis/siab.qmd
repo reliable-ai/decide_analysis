@@ -101,6 +101,10 @@ vis_observed_vs_predicted(reg_siab)
 vis_observed_vs_predicted(reg_siab, type = "kde")
 ```
 
+```{r siab-regression-observed-predicted-hist-overlapping}
+vis_observed_vs_predicted(reg_siab, type = "hist")
+```
+
 ```{r siab-regression-observed-predicted-hist}
 #| fig-height: 3
 #| fig-width: 7

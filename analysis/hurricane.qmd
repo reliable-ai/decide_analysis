@@ -71,6 +71,10 @@ vis_observed_vs_predicted(reg_hurr)
 vis_observed_vs_predicted(reg_hurr, type = "kde")
 ```
 
+```{r hurricane-regression-observed-predicted-hist-overlapping}
+vis_observed_vs_predicted(reg_hurr, type = "hist")
+```
+
 
 ```{r hurricane-regression-observed-predicted-hist}
 #| fig-height: 3

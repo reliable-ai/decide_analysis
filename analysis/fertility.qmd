@@ -74,6 +74,10 @@ vis_observed_vs_predicted(reg_fert)
 vis_observed_vs_predicted(reg_fert, type = "kde")
 ```
 
+```{r fertility-regression-observed-predicted-hist-overlapping}
+vis_observed_vs_predicted(reg_fert, type = "hist")
+```
+
 ```{r fertility-regression-observed-predicted-hist}
 #| fig-height: 3
 #| fig-width: 7
