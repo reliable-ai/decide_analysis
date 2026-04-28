@@ -16,6 +16,8 @@ vis_residuals_vs_fitted <- function(reg_result) {
 vis_observed_vs_predicted <- function(reg_result, type = c("scatter", "hist", "kde"), facet = FALSE) {
   type <- match.arg(type)
 
+  col_name <- names(reg_result$model)[[1]]
+
   df <- tibble(
     observed = reg_result$model[[1]],
     predicted = fitted(reg_result)
@@ -36,17 +38,17 @@ vis_observed_vs_predicted <- function(reg_result, type = c("scatter", "hist", "k
       p <- df_long |>
         ggplot(aes(x = value, fill = source, colour = source)) +
         geom_histogram(alpha = 0.5, position = "identity") +
-        labs(x = "Value", y = "Count", fill = NULL, colour = NULL) +
+        labs(x = col_name, y = "Count", fill = NULL, colour = NULL) +
         theme_classic()
     } else {
       p <- df_long |>
         ggplot(aes(x = value, fill = source, colour = source)) +
         geom_density(alpha = 0.3) +
-        labs(x = "Value", y = "Density", fill = NULL, colour = NULL) +
+        labs(x = col_name, y = "Density", fill = NULL, colour = NULL) +
         theme_classic()
     }
 
-    if (facet) p <- p + facet_wrap(~source)
+    if (facet) p <- p + facet_wrap(~source) + theme(legend.position = "none")
     p
   }
 }

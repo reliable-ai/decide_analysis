@@ -33,11 +33,17 @@ vis_inter_method_stability <- function (inter_method_stability_summary,
   }
 
   decision_order <- plot_data |>
-    filter(fixed_decision_label != "Average") |>
+    filter(
+      fixed_decision_label != "Average",
+      fixed_decision_label != baseline_label
+    ) |>
     group_by(fixed_decision_label) |>
     summarise(order_value = safe_mean(mean_rank_correlation), .groups = "drop") |>
     arrange(order_value) |>
     pull(fixed_decision_label)
+
+  # full multiverse row always sits at the top of the heatmap (last level = top of y-axis)
+  decision_order <- c(decision_order, baseline_label)
 
   if (add_average) {
     decision_order <- c("Average", decision_order)
