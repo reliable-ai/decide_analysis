@@ -106,98 +106,6 @@ test_that("calc_intra_method_stability compares baseline and ablated importances
   )
 })
 
-test_that("calc_option_metric_changes computes per-option metric means and spread", {
-  mv <- tibble(
-    mv_dim_A = c("a1", "a1", "a2", "a2"),
-    mv_dim_B = c("b1", "b2", "b1", "b2"),
-    accuracy = c(0.8, 0.9, 0.6, 0.7)
-  )
-
-  result <- calc_option_metric_changes(mv, "accuracy")
-
-  # A: option means 0.85 and 0.65 → mean_abs_diff = 0.20
-  expect_equal(
-    result |> filter(fixed_decision == "mv_dim_A") |> pull(metric_change),
-    0.20
-  )
-  # B: option means 0.70 and 0.80 → mean_abs_diff = 0.10
-  expect_equal(
-    result |> filter(fixed_decision == "mv_dim_B") |> pull(metric_change),
-    0.10
-  )
-  expect_equal(
-    result |> filter(fixed_decision == "mv_dim_A") |> pull(n_options),
-    2L
-  )
-})
-
-test_that("calc_option_metric_changes respects spread_stat argument", {
-  mv <- tibble(
-    mv_dim_A = c("a1", "a2", "a3"),
-    accuracy = c(0.5, 0.7, 0.9)
-  )
-
-  expect_equal(
-    calc_option_metric_changes(mv, "accuracy", spread_stat = "range") |>
-      pull(metric_change),
-    0.4
-  )
-  expect_equal(
-    calc_option_metric_changes(mv, "accuracy", spread_stat = "sd") |>
-      pull(metric_change),
-    sd(c(0.5, 0.7, 0.9))
-  )
-})
-
-test_that("option sensitivity summary joins metric change with baseline importance", {
-  mv <- tibble(
-    mv_dim_A = c("a1", "a1", "a2", "a2"),
-    mv_dim_B = c("b1", "b2", "b1", "b2"),
-    accuracy = c(0.8, 0.9, 0.6, 0.7)
-  )
-
-  baseline_importance <- tibble(
-    method = c("within", "within"),
-    target_decision = c("mv_dim_A", "mv_dim_B"),
-    target_decision_label = c("A", "B"),
-    importance = c(0.8, 0.2)
-  )
-
-  result <- summarise_option_sensitivity(mv, "accuracy", baseline_importance)
-
-  expect_equal(
-    result |> filter(method == "within", fixed_decision == "mv_dim_A") |>
-      pull(metric_change),
-    0.20
-  )
-  expect_equal(
-    result |> filter(method == "within", fixed_decision == "mv_dim_A") |>
-      pull(baseline_importance),
-    0.8
-  )
-  expect_equal(
-    result |> filter(method == "within", fixed_decision == "mv_dim_B") |>
-      pull(metric_change),
-    0.10
-  )
-})
-
-test_that("predictive relationship summary computes within-method association", {
-  option_sensitivity_summary <- tibble(
-    fixed_decision = c("mv_dim_A", "mv_dim_B", "mv_dim_C"),
-    fixed_decision_label = c("A", "B", "C"),
-    method = c("within", "within", "within"),
-    baseline_importance = c(1, 2, 3),
-    metric_change = c(2, 4, 6),
-    n_options = c(2L, 2L, 2L)
-  )
-
-  predictive_relationship <- summarise_predictive_relationship(option_sensitivity_summary)
-
-  expect_equal(predictive_relationship$association, 1)
-  expect_equal(predictive_relationship$n_decisions, 3)
-})
-
 test_that("add_stability_average_row appends grouped averages", {
   stability_summary <- tibble(
     comparison = c("within vs between", "within vs between", "fanova vs between", "fanova vs between"),
@@ -303,35 +211,6 @@ test_that("vis_intra_method_stability can show values and add averages", {
       pull(mean_rank_correlation),
     0.6
   )
-})
-
-test_that("vis_option_sensitivity toggles regression line and facet correlation label", {
-  option_sensitivity_summary <- tibble(
-    fixed_decision = c("mv_dim_A", "mv_dim_B", "mv_dim_C"),
-    fixed_decision_label = c("A", "B", "C"),
-    method = c("within", "within", "within"),
-    baseline_importance = c(1, 2, 3),
-    metric_change = c(2, 4, 6),
-    n_options = c(2L, 2L, 2L)
-  )
-
-  default_plot <- vis_option_sensitivity(option_sensitivity_summary)
-  default_geoms <- vapply(default_plot$layers, function(layer) class(layer$geom)[1], character(1))
-
-  expect_false("GeomSmooth" %in% default_geoms)
-  expect_false("GeomText" %in% default_geoms)
-  expect_equal(unique(default_plot$data$method_label), "within\nr = 1.00")
-
-  annotated_plot <- vis_option_sensitivity(
-    option_sensitivity_summary,
-    show_regression_line = TRUE,
-    show_correlation = FALSE
-  )
-  annotated_geoms <- vapply(annotated_plot$layers, function(layer) class(layer$geom)[1], character(1))
-
-  expect_true("GeomSmooth" %in% annotated_geoms)
-  expect_false("GeomText" %in% annotated_geoms)
-  expect_equal(unique(annotated_plot$data$method_label), "within")
 })
 
 test_that("regression importance aggregates absolute coefficients by decision", {

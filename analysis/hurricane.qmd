@@ -215,30 +215,3 @@ ablation_hurr$intra_method_stability_summary |>
 vis_intra_method_stability(ablation_hurr$intra_method_stability_summary)
 ```
 
-## Does baseline importance predict option-induced change?
-
-For each decision and method, compare the original full-multiverse importance
-of that decision to the mean pairwise change in the ablated importance vectors
-across the different fixed options of that decision.
-
-```{r hurricane-ablation-option-sensitivity-table}
-ablation_hurr$option_sensitivity |>
-  arrange(method, desc(baseline_importance)) |>
-  select(
-    fixed_decision_label,
-    method,
-    baseline_importance,
-    metric_change,
-    n_options
-  )
-```
-
-```{r hurricane-ablation-predictive-relationship}
-ablation_hurr$predictive_relationship
-```
-
-```{r hurricane-ablation-option-sensitivity-plot}
-#| fig-width: 8
-#| fig-height: 7.5
-vis_option_sensitivity(ablation_hurr$option_sensitivity)
-```

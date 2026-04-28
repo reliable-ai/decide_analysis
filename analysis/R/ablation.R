@@ -213,111 +213,11 @@ summarise_intra_method_stability <- function (intra_method_stability_tbl,
 calc_method_stability <- calc_inter_method_stability
 summarise_method_stability <- summarise_inter_method_stability
 
-# For each decision, groups the full multiverse by option value, computes the
-# mean of colname_metric per option group, then summarises the spread of those
-# per-option means with the chosen statistic:
-#   "mean_abs_diff"  mean absolute pairwise difference (default)
-#   "range"          max minus min of option means
-#   "sd"             standard deviation of option means
-calc_option_metric_changes <- function (mv, colname_metric, dim_prefix = "mv_dim_",
-                                        spread_stat = c("mean_abs_diff", "range", "sd")) {
-  spread_stat <- match.arg(spread_stat)
-
-  dim_cols <- mv |>
-    select(starts_with(dim_prefix)) |>
-    colnames()
-
-  purrr::map_dfr(
-    dim_cols,
-    function (decision) {
-      option_means <- mv |>
-        group_by(.data[[decision]]) |>
-        summarise(
-          option_mean = mean(.data[[colname_metric]], na.rm = TRUE),
-          .groups = "drop"
-        ) |>
-        pull(option_mean)
-
-      metric_change <- switch(
-        spread_stat,
-        mean_abs_diff = {
-          if (length(option_means) < 2) {
-            NA_real_
-          } else {
-            pairs <- combn(option_means, 2)
-            mean(abs(pairs[1, ] - pairs[2, ]))
-          }
-        },
-        range = max(option_means, na.rm = TRUE) - min(option_means, na.rm = TRUE),
-        sd    = sd(option_means, na.rm = TRUE)
-      )
-
-      tibble(
-        fixed_decision = decision,
-        metric_change  = metric_change,
-        n_options      = length(option_means)
-      )
-    }
-  )
-}
-
-# Joins per-decision metric change with baseline importance so downstream code
-# can test whether importance is predictive of metric sensitivity.
-summarise_option_sensitivity <- function (mv, colname_metric, baseline_importance,
-                                          dim_prefix = "mv_dim_",
-                                          spread_stat = c("mean_abs_diff", "range", "sd")) {
-  spread_stat <- match.arg(spread_stat)
-
-  option_metric_changes <- calc_option_metric_changes(
-    mv,
-    colname_metric = colname_metric,
-    dim_prefix     = dim_prefix,
-    spread_stat    = spread_stat
-  )
-
-  baseline_importance |>
-    select(method, target_decision, importance) |>
-    rename(fixed_decision = target_decision, baseline_importance = importance) |>
-    left_join(option_metric_changes, by = "fixed_decision") |>
-    mutate(
-      fixed_decision_label = strip_dim_prefix(fixed_decision, dim_prefix = dim_prefix)
-    ) |>
-    select(
-      fixed_decision,
-      fixed_decision_label,
-      method,
-      baseline_importance,
-      metric_change,
-      n_options
-    )
-}
-
-# Tests whether decisions that look important in the full multiverse are also
-# the ones where the metric changes more across options.
-# Correlation is computed across decisions within each method.
-summarise_predictive_relationship <- function (option_sensitivity_summary,
-                                               cor_method = "pearson") {
-  option_sensitivity_summary |>
-    group_by(method) |>
-    summarise(
-      association = safe_cor(
-        baseline_importance,
-        metric_change,
-        method = cor_method
-      ),
-      n_decisions = sum(complete.cases(baseline_importance, metric_change)),
-      .groups = "drop"
-    )
-}
-
 # End-to-end ablation pipeline:
 # 1) compute baseline importance on the full multiverse,
 # 2) recompute importance after fixing each decision to each option,
 # 3) compare methods within each ablated setting,
-# 4) compare each method's full-multiverse importances to its ablated variants,
-# 5) measure how much the metric itself changes across options of each decision,
-# 6) join metric change with baseline importance (option_sensitivity),
-# 7) correlate baseline importance with metric-level option sensitivity.
+# 4) compare each method's full-multiverse importances to its ablated variants.
 run_ablation_analysis <- function (mv, colname_metric, dim_prefix = "mv_dim_") {
   # Baseline: importances computed on the full multiverse (no fixed decision).
   baseline_importance <- tidy_importance_methods(
@@ -361,19 +261,6 @@ run_ablation_analysis <- function (mv, colname_metric, dim_prefix = "mv_dim_") {
     ablation_importance = ablation_importance
   )
 
-  # Option-level metric change and its predictive relationship with importance.
-  option_metric_changes <- calc_option_metric_changes(
-    mv,
-    colname_metric = colname_metric,
-    dim_prefix = dim_prefix
-  )
-  option_sensitivity <- summarise_option_sensitivity(
-    mv,
-    colname_metric      = colname_metric,
-    baseline_importance = baseline_importance,
-    dim_prefix          = dim_prefix
-  )
-
   list(
     baseline_importance = baseline_importance,
     ablation_importance = ablation_importance,
@@ -386,9 +273,6 @@ run_ablation_analysis <- function (mv, colname_metric, dim_prefix = "mv_dim_") {
     intra_method_stability_summary = summarise_intra_method_stability(
       intra_method_stability,
       dim_prefix = dim_prefix
-    ),
-    option_metric_changes = option_metric_changes,
-    option_sensitivity = option_sensitivity,
-    predictive_relationship = summarise_predictive_relationship(option_sensitivity)
+    )
   )
 }
