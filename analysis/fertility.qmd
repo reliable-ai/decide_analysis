@@ -226,8 +226,8 @@ ablation_fert$option_sensitivity |>
     fixed_decision_label,
     method,
     baseline_importance,
-    mean_pairwise_abs_change,
-    mean_pairwise_rank_correlation
+    metric_change,
+    n_options
   )
 ```
 

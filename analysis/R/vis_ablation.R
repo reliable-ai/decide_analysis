@@ -157,15 +157,15 @@ vis_option_sensitivity <- function (option_sensitivity_summary,
   plot <- plot_data |>
     ggplot(aes(
       x = baseline_importance,
-      y = mean_pairwise_abs_change,
+      y = metric_change,
       label = fixed_decision_label
     )) +
     geom_point() +
     ggrepel::geom_text_repel() +
     facet_wrap(vars(method_label), scales = "free") +
     labs(
-      x = "Baseline importance of fixed decision",
-      y = "Mean pairwise change across fixed options"
+      x = "Baseline importance of decision",
+      y = "Mean absolute difference in metric across options"
     ) +
     theme_classic()
 

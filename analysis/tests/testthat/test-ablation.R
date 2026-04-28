@@ -106,50 +106,79 @@ test_that("calc_intra_method_stability compares baseline and ablated importances
   )
 })
 
-test_that("option sensitivity summary links baseline importance to option changes", {
-  ablation_tbl <- tibble(
-    fixed_decision = "mv_dim_A",
-    fixed_decision_label = "A",
-    fixed_option = c(rep("a1", 2), rep("a2", 2), rep("a1", 2), rep("a2", 2)),
-    method = c(rep("within", 4), rep("between", 4)),
-    target_decision = rep(c("mv_dim_B", "mv_dim_C"), 4),
-    target_decision_label = rep(c("B", "C"), 4),
-    importance = c(1, 2, 2, 4, 5, 5, 7, 5),
-    n_universes = 4
+test_that("calc_option_metric_changes computes per-option metric means and spread", {
+  mv <- tibble(
+    mv_dim_A = c("a1", "a1", "a2", "a2"),
+    mv_dim_B = c("b1", "b2", "b1", "b2"),
+    accuracy = c(0.8, 0.9, 0.6, 0.7)
   )
 
-  option_pair_changes <- calc_option_pair_changes(ablation_tbl)
+  result <- calc_option_metric_changes(mv, "accuracy")
+
+  # A: option means 0.85 and 0.65 → mean_abs_diff = 0.20
+  expect_equal(
+    result |> filter(fixed_decision == "mv_dim_A") |> pull(metric_change),
+    0.20
+  )
+  # B: option means 0.70 and 0.80 → mean_abs_diff = 0.10
+  expect_equal(
+    result |> filter(fixed_decision == "mv_dim_B") |> pull(metric_change),
+    0.10
+  )
+  expect_equal(
+    result |> filter(fixed_decision == "mv_dim_A") |> pull(n_options),
+    2L
+  )
+})
+
+test_that("calc_option_metric_changes respects spread_stat argument", {
+  mv <- tibble(
+    mv_dim_A = c("a1", "a2", "a3"),
+    accuracy = c(0.5, 0.7, 0.9)
+  )
 
   expect_equal(
-    option_pair_changes |>
-      filter(method == "within") |>
-      pull(mean_abs_change),
-    1.5
+    calc_option_metric_changes(mv, "accuracy", spread_stat = "range") |>
+      pull(metric_change),
+    0.4
+  )
+  expect_equal(
+    calc_option_metric_changes(mv, "accuracy", spread_stat = "sd") |>
+      pull(metric_change),
+    sd(c(0.5, 0.7, 0.9))
+  )
+})
+
+test_that("option sensitivity summary joins metric change with baseline importance", {
+  mv <- tibble(
+    mv_dim_A = c("a1", "a1", "a2", "a2"),
+    mv_dim_B = c("b1", "b2", "b1", "b2"),
+    accuracy = c(0.8, 0.9, 0.6, 0.7)
   )
 
   baseline_importance <- tibble(
-    method = c("within", "between"),
-    target_decision = c("mv_dim_A", "mv_dim_A"),
-    target_decision_label = c("A", "A"),
+    method = c("within", "within"),
+    target_decision = c("mv_dim_A", "mv_dim_B"),
+    target_decision_label = c("A", "B"),
     importance = c(0.8, 0.2)
   )
 
-  option_sensitivity <- summarise_option_sensitivity(
-    option_pair_changes,
-    baseline_importance = baseline_importance
-  )
+  result <- summarise_option_sensitivity(mv, "accuracy", baseline_importance)
 
   expect_equal(
-    option_sensitivity |>
-      filter(method == "within") |>
+    result |> filter(method == "within", fixed_decision == "mv_dim_A") |>
+      pull(metric_change),
+    0.20
+  )
+  expect_equal(
+    result |> filter(method == "within", fixed_decision == "mv_dim_A") |>
       pull(baseline_importance),
     0.8
   )
   expect_equal(
-    option_sensitivity |>
-      filter(method == "between") |>
-      pull(mean_pairwise_abs_change),
-    1
+    result |> filter(method == "within", fixed_decision == "mv_dim_B") |>
+      pull(metric_change),
+    0.10
   )
 })
 
@@ -159,9 +188,8 @@ test_that("predictive relationship summary computes within-method association", 
     fixed_decision_label = c("A", "B", "C"),
     method = c("within", "within", "within"),
     baseline_importance = c(1, 2, 3),
-    mean_pairwise_abs_change = c(2, 4, 6),
-    mean_pairwise_rank_correlation = c(1, 1, 1),
-    n_option_pairs = c(1, 1, 1)
+    metric_change = c(2, 4, 6),
+    n_options = c(2L, 2L, 2L)
   )
 
   predictive_relationship <- summarise_predictive_relationship(option_sensitivity_summary)
@@ -283,9 +311,8 @@ test_that("vis_option_sensitivity toggles regression line and facet correlation 
     fixed_decision_label = c("A", "B", "C"),
     method = c("within", "within", "within"),
     baseline_importance = c(1, 2, 3),
-    mean_pairwise_abs_change = c(2, 4, 6),
-    mean_pairwise_rank_correlation = c(1, 1, 1),
-    n_option_pairs = c(1, 1, 1)
+    metric_change = c(2, 4, 6),
+    n_options = c(2L, 2L, 2L)
   )
 
   default_plot <- vis_option_sensitivity(option_sensitivity_summary)
@@ -293,7 +320,7 @@ test_that("vis_option_sensitivity toggles regression line and facet correlation 
 
   expect_false("GeomSmooth" %in% default_geoms)
   expect_false("GeomText" %in% default_geoms)
-  expect_equal(unique(default_plot$data$method_label), "within\nrho = 1.00")
+  expect_equal(unique(default_plot$data$method_label), "within\nr = 1.00")
 
   annotated_plot <- vis_option_sensitivity(
     option_sensitivity_summary,
