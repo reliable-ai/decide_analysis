@@ -6,6 +6,7 @@ suppressPackageStartupMessages({
   library(ggraph)
   library(reticulate)
   library(performance)
+  library(nicknames) # pak::pak("jansim/nicknames")
 })
 
 # Load all scripts in the R directory, which do *not* start with a `_`

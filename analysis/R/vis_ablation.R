@@ -20,7 +20,7 @@ vis_inter_method_stability <- function (inter_method_stability_summary,
                                         add_average = TRUE) {
   plot_data <- inter_method_stability_summary |>
     mutate(
-      comparison = paste(method_x, "vs", method_y),
+      comparison = paste(method_x |> nn(), "vs", method_y |> nn()),
       fixed_decision_label = if_else(
         fixed_decision == "full_multiverse",
         baseline_label,
@@ -113,7 +113,7 @@ vis_intra_method_stability <- function (intra_method_stability_summary,
   plot <- ggplot(
     plot_data,
     aes(
-      x = method,
+      x = method |> nn(),
       y = fixed_decision_label,
       fill = mean_rank_correlation
     )
