@@ -73,6 +73,10 @@ vis_inter_method_stability <- function (inter_method_stability_summary,
     plot <- plot + geom_text(aes(label = correlation_label), size = 3)
   }
 
+  if (add_average) {
+    plot <- plot + geom_hline(yintercept = 1.5, color = "black", linewidth = 0.5)
+  }
+
   plot
 }
 
@@ -122,6 +126,10 @@ vis_intra_method_stability <- function (intra_method_stability_summary,
 
   if (show_values) {
     plot <- plot + geom_text(aes(label = correlation_label), size = 3)
+  }
+
+  if (add_average) {
+    plot <- plot + geom_hline(yintercept = 1.5, color = "black", linewidth = 0.5)
   }
 
   plot
