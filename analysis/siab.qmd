@@ -220,7 +220,10 @@ ablation_siab$inter_method_stability_summary |>
 ```
 
 ```{r siab-ablation-inter-method-plot}
-vis_inter_method_stability(ablation_siab$inter_method_stability_summary)
+#| fig-width: 6
+#| fig-height: 4.5
+vis_inter_method_stability(ablation_siab$inter_method_stability_summary) +
+  theme(legend.position = "none")
 ```
 
 ## Intra-method stability
