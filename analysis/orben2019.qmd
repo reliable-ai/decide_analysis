@@ -1,0 +1,596 @@
+---
+title: "Analyse Case Study: Orben 2019 (NHB)"
+format: pdf
+---
+
+```{r setup}
+source("R/_load.R")
+```
+
+This document analyses the three multiverse datasets from Orben & Przybylski (2019, *Nature Human Behaviour*): MCS Total, MTF, and YRBS.
+The outcome metric used throughout is the regression effect size (`effect`).
+
+---
+
+# MCS Total
+
+```{r mcs-load-data}
+mv_mcs <- load_multiverse("orben2019nhb_mcs_total")
+mv_mcs
+```
+
+## Overview
+
+```{r mcs-decisions-overview}
+mv_mcs |>
+  get_multiverse_decisions()
+```
+
+```{r mcs-multiverse-simple}
+#| fig-width: 10
+vis_multiverse_simple(mv_mcs, direction = "right")
+```
+
+## Existing Methods
+
+### Regression
+
+```{r mcs-regression-fit}
+reg_mcs <- calc_regression(mv_mcs, colname_metric = "effect")
+attr(reg_mcs, "tidy")
+```
+
+#### Performance
+
+```{r mcs-regression-performance}
+reg_mcs |>
+  model_performance()
+```
+
+#### Model Fit
+
+```{r mcs-regression-model-check}
+#| fig-width: 9
+#| fig-height: 12
+reg_mcs |>
+  check_model()
+```
+
+```{r mcs-regression-pred-check}
+reg_mcs |>
+  check_predictions()
+```
+
+```{r mcs-regression-residuals-fitted}
+vis_residuals_vs_fitted(reg_mcs)
+```
+
+```{r mcs-regression-observed-predicted}
+vis_observed_vs_predicted(reg_mcs)
+```
+
+```{r mcs-regression-observed-predicted-kde}
+vis_observed_vs_predicted(reg_mcs, type = "kde")
+```
+
+```{r mcs-regression-observed-predicted-hist-overlapping}
+vis_observed_vs_predicted(reg_mcs, type = "hist")
+```
+
+```{r mcs-regression-observed-predicted-hist}
+#| fig-height: 3
+#| fig-width: 7
+vis_observed_vs_predicted(reg_mcs, type = "hist", facet = T)
+```
+
+```{r mcs-regression-coefficients}
+vis_regression_coefficients(reg_mcs)
+```
+
+#### Importance
+
+```{r mcs-regression-importance}
+regimp_mcs <- calc_regression_importance(mv_mcs, colname_metric = "effect")
+regimp_mcs
+```
+
+```{r mcs-regression-importance-plot}
+vis_importance(regimp_mcs)
+```
+
+### FANOVA
+
+```{r mcs-fanova-fit}
+fanova_mcs <- calc_fanova(mv_mcs, colname_metric = "effect")
+fanova_mcs
+```
+
+```{r mcs-fanova-importance-plot}
+fanova_mcs |>
+  head(10) |>
+  fanova_to_vec() |>
+  vis_importance()
+```
+
+Only main effects
+
+```{r mcs-fanova-main-effects-plot}
+fanova_mcs |>
+  filter(is.na(level_1)) |>
+  head(10) |>
+  fanova_to_vec() |>
+  vis_importance()
+```
+
+## Our Framework
+
+```{r mcs-within-bucket}
+within_mcs <- calc_within_bucket_variation(mv_mcs, colname_metric = "effect")
+within_mcs
+```
+
+```{r mcs-within-bucket-plot}
+vis_importance(within_mcs)
+```
+
+```{r mcs-between-bucket}
+between_mcs <- calc_between_bucket_variation(mv_mcs, colname_metric = "effect")
+between_mcs
+```
+
+```{r mcs-between-bucket-plot}
+vis_importance(between_mcs)
+```
+
+### Combine
+
+```{r mcs-combine-importance}
+vis_importance_2dim(
+  between_mcs,
+  fanova_mcs |> fanova_to_vec()
+)
+```
+
+## Ablation Study
+
+Fix each decision to one option, recompute the importance estimates on the
+reduced multiverse, and compare the resulting importance vectors across
+methods and across options of the fixed decision.
+
+```{r mcs-ablation-run}
+ablation_mcs <- run_ablation_analysis(mv_mcs, colname_metric = "effect")
+```
+
+### Inter-method stability
+
+```{r mcs-ablation-inter-method-table}
+ablation_mcs$inter_method_stability_summary |>
+  mutate(
+    fixed_decision_label = if_else(
+      fixed_decision == "full_multiverse",
+      "full multiverse",
+      fixed_decision_label
+    )
+  ) |>
+  select(
+    fixed_decision_label,
+    method_x,
+    method_y,
+    mean_rank_correlation,
+    min_rank_correlation
+  )
+```
+
+```{r mcs-ablation-inter-method-plot}
+#| fig-width: 6
+#| fig-height: 4.5
+vis_inter_method_stability(ablation_mcs$inter_method_stability_summary) +
+  theme(legend.position = "none")
+```
+
+### Intra-method stability
+
+```{r mcs-ablation-intra-method-table}
+ablation_mcs$intra_method_stability_summary |>
+  select(
+    fixed_decision_label,
+    method,
+    mean_rank_correlation,
+    min_rank_correlation,
+    mean_abs_difference
+  )
+```
+
+```{r mcs-ablation-intra-method-plot}
+vis_intra_method_stability(ablation_mcs$intra_method_stability_summary)
+```
+
+---
+
+# MTF
+
+```{r mtf-load-data}
+mv_mtf <- load_multiverse("orben2019nhb_mtf")
+mv_mtf
+```
+
+## Overview
+
+```{r mtf-decisions-overview}
+mv_mtf |>
+  get_multiverse_decisions()
+```
+
+```{r mtf-multiverse-simple}
+#| fig-width: 10
+vis_multiverse_simple(mv_mtf, direction = "right")
+```
+
+## Existing Methods
+
+### Regression
+
+```{r mtf-regression-fit}
+reg_mtf <- calc_regression(mv_mtf, colname_metric = "effect")
+attr(reg_mtf, "tidy")
+```
+
+#### Performance
+
+```{r mtf-regression-performance}
+reg_mtf |>
+  model_performance()
+```
+
+#### Model Fit
+
+```{r mtf-regression-model-check}
+#| fig-width: 9
+#| fig-height: 12
+reg_mtf |>
+  check_model()
+```
+
+```{r mtf-regression-pred-check}
+reg_mtf |>
+  check_predictions()
+```
+
+```{r mtf-regression-residuals-fitted}
+vis_residuals_vs_fitted(reg_mtf)
+```
+
+```{r mtf-regression-observed-predicted}
+vis_observed_vs_predicted(reg_mtf)
+```
+
+```{r mtf-regression-observed-predicted-kde}
+vis_observed_vs_predicted(reg_mtf, type = "kde")
+```
+
+```{r mtf-regression-observed-predicted-hist-overlapping}
+vis_observed_vs_predicted(reg_mtf, type = "hist")
+```
+
+```{r mtf-regression-observed-predicted-hist}
+#| fig-height: 3
+#| fig-width: 7
+vis_observed_vs_predicted(reg_mtf, type = "hist", facet = T)
+```
+
+```{r mtf-regression-coefficients}
+vis_regression_coefficients(reg_mtf)
+```
+
+#### Importance
+
+```{r mtf-regression-importance}
+regimp_mtf <- calc_regression_importance(mv_mtf, colname_metric = "effect")
+regimp_mtf
+```
+
+```{r mtf-regression-importance-plot}
+vis_importance(regimp_mtf)
+```
+
+### FANOVA
+
+```{r mtf-fanova-fit}
+fanova_mtf <- calc_fanova(mv_mtf, colname_metric = "effect")
+fanova_mtf
+```
+
+```{r mtf-fanova-importance-plot}
+fanova_mtf |>
+  head(10) |>
+  fanova_to_vec() |>
+  vis_importance()
+```
+
+Only main effects
+
+```{r mtf-fanova-main-effects-plot}
+fanova_mtf |>
+  filter(is.na(level_1)) |>
+  head(10) |>
+  fanova_to_vec() |>
+  vis_importance()
+```
+
+## Our Framework
+
+```{r mtf-within-bucket}
+within_mtf <- calc_within_bucket_variation(mv_mtf, colname_metric = "effect")
+within_mtf
+```
+
+```{r mtf-within-bucket-plot}
+vis_importance(within_mtf)
+```
+
+```{r mtf-between-bucket}
+between_mtf <- calc_between_bucket_variation(mv_mtf, colname_metric = "effect")
+between_mtf
+```
+
+```{r mtf-between-bucket-plot}
+vis_importance(between_mtf)
+```
+
+### Combine
+
+```{r mtf-combine-importance}
+vis_importance_2dim(
+  between_mtf,
+  fanova_mtf |> fanova_to_vec()
+)
+```
+
+## Ablation Study
+
+Fix each decision to one option, recompute the importance estimates on the
+reduced multiverse, and compare the resulting importance vectors across
+methods and across options of the fixed decision.
+
+```{r mtf-ablation-run}
+ablation_mtf <- run_ablation_analysis(mv_mtf, colname_metric = "effect")
+```
+
+### Inter-method stability
+
+```{r mtf-ablation-inter-method-table}
+ablation_mtf$inter_method_stability_summary |>
+  mutate(
+    fixed_decision_label = if_else(
+      fixed_decision == "full_multiverse",
+      "full multiverse",
+      fixed_decision_label
+    )
+  ) |>
+  select(
+    fixed_decision_label,
+    method_x,
+    method_y,
+    mean_rank_correlation,
+    min_rank_correlation
+  )
+```
+
+```{r mtf-ablation-inter-method-plot}
+#| fig-width: 6
+#| fig-height: 4.5
+vis_inter_method_stability(ablation_mtf$inter_method_stability_summary) +
+  theme(legend.position = "none")
+```
+
+### Intra-method stability
+
+```{r mtf-ablation-intra-method-table}
+ablation_mtf$intra_method_stability_summary |>
+  select(
+    fixed_decision_label,
+    method,
+    mean_rank_correlation,
+    min_rank_correlation,
+    mean_abs_difference
+  )
+```
+
+```{r mtf-ablation-intra-method-plot}
+vis_intra_method_stability(ablation_mtf$intra_method_stability_summary)
+```
+
+---
+
+# YRBS
+
+```{r yrbs-load-data}
+mv_yrbs <- load_multiverse("orben2019nhb_yrbs")
+mv_yrbs
+```
+
+## Overview
+
+```{r yrbs-decisions-overview}
+mv_yrbs |>
+  get_multiverse_decisions()
+```
+
+```{r yrbs-multiverse-simple}
+#| fig-width: 10
+vis_multiverse_simple(mv_yrbs, direction = "right")
+```
+
+## Existing Methods
+
+### Regression
+
+```{r yrbs-regression-fit}
+reg_yrbs <- calc_regression(mv_yrbs, colname_metric = "effect")
+attr(reg_yrbs, "tidy")
+```
+
+#### Performance
+
+```{r yrbs-regression-performance}
+reg_yrbs |>
+  model_performance()
+```
+
+#### Model Fit
+
+```{r yrbs-regression-model-check}
+#| fig-width: 9
+#| fig-height: 12
+reg_yrbs |>
+  check_model()
+```
+
+```{r yrbs-regression-pred-check}
+reg_yrbs |>
+  check_predictions()
+```
+
+```{r yrbs-regression-residuals-fitted}
+vis_residuals_vs_fitted(reg_yrbs)
+```
+
+```{r yrbs-regression-observed-predicted}
+vis_observed_vs_predicted(reg_yrbs)
+```
+
+```{r yrbs-regression-observed-predicted-kde}
+vis_observed_vs_predicted(reg_yrbs, type = "kde")
+```
+
+```{r yrbs-regression-observed-predicted-hist-overlapping}
+vis_observed_vs_predicted(reg_yrbs, type = "hist")
+```
+
+```{r yrbs-regression-observed-predicted-hist}
+#| fig-height: 3
+#| fig-width: 7
+vis_observed_vs_predicted(reg_yrbs, type = "hist", facet = T)
+```
+
+```{r yrbs-regression-coefficients}
+vis_regression_coefficients(reg_yrbs)
+```
+
+#### Importance
+
+```{r yrbs-regression-importance}
+regimp_yrbs <- calc_regression_importance(mv_yrbs, colname_metric = "effect")
+regimp_yrbs
+```
+
+```{r yrbs-regression-importance-plot}
+vis_importance(regimp_yrbs)
+```
+
+### FANOVA
+
+```{r yrbs-fanova-fit}
+fanova_yrbs <- calc_fanova(mv_yrbs, colname_metric = "effect")
+fanova_yrbs
+```
+
+```{r yrbs-fanova-importance-plot}
+fanova_yrbs |>
+  head(10) |>
+  fanova_to_vec() |>
+  vis_importance()
+```
+
+Only main effects
+
+```{r yrbs-fanova-main-effects-plot}
+fanova_yrbs |>
+  filter(is.na(level_1)) |>
+  head(10) |>
+  fanova_to_vec() |>
+  vis_importance()
+```
+
+## Our Framework
+
+```{r yrbs-within-bucket}
+within_yrbs <- calc_within_bucket_variation(mv_yrbs, colname_metric = "effect")
+within_yrbs
+```
+
+```{r yrbs-within-bucket-plot}
+vis_importance(within_yrbs)
+```
+
+```{r yrbs-between-bucket}
+between_yrbs <- calc_between_bucket_variation(mv_yrbs, colname_metric = "effect")
+between_yrbs
+```
+
+```{r yrbs-between-bucket-plot}
+vis_importance(between_yrbs)
+```
+
+### Combine
+
+```{r yrbs-combine-importance}
+vis_importance_2dim(
+  between_yrbs,
+  fanova_yrbs |> fanova_to_vec()
+)
+```
+
+## Ablation Study
+
+Fix each decision to one option, recompute the importance estimates on the
+reduced multiverse, and compare the resulting importance vectors across
+methods and across options of the fixed decision.
+
+```{r yrbs-ablation-run}
+ablation_yrbs <- run_ablation_analysis(mv_yrbs, colname_metric = "effect")
+```
+
+### Inter-method stability
+
+```{r yrbs-ablation-inter-method-table}
+ablation_yrbs$inter_method_stability_summary |>
+  mutate(
+    fixed_decision_label = if_else(
+      fixed_decision == "full_multiverse",
+      "full multiverse",
+      fixed_decision_label
+    )
+  ) |>
+  select(
+    fixed_decision_label,
+    method_x,
+    method_y,
+    mean_rank_correlation,
+    min_rank_correlation
+  )
+```
+
+```{r yrbs-ablation-inter-method-plot}
+#| fig-width: 6
+#| fig-height: 4.5
+vis_inter_method_stability(ablation_yrbs$inter_method_stability_summary) +
+  theme(legend.position = "none")
+```
+
+### Intra-method stability
+
+```{r yrbs-ablation-intra-method-table}
+ablation_yrbs$intra_method_stability_summary |>
+  select(
+    fixed_decision_label,
+    method,
+    mean_rank_correlation,
+    min_rank_correlation,
+    mean_abs_difference
+  )
+```
+
+```{r yrbs-ablation-intra-method-plot}
+vis_intra_method_stability(ablation_yrbs$intra_method_stability_summary)
+```
