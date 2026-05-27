@@ -68,18 +68,21 @@ vis_observed_vs_predicted(reg_hurr)
 ```
 
 ```{r hurricane-regression-observed-predicted-kde}
-vis_observed_vs_predicted(reg_hurr, type = "kde")
+vis_observed_vs_predicted(reg_hurr, type = "kde") +
+  labs(x = nn("expected_deaths_diff"))
 ```
 
 ```{r hurricane-regression-observed-predicted-hist-overlapping}
-vis_observed_vs_predicted(reg_hurr, type = "hist")
+vis_observed_vs_predicted(reg_hurr, type = "hist") +
+  labs(x = nn("expected_deaths_diff"))
 ```
 
 
 ```{r hurricane-regression-observed-predicted-hist}
 #| fig-height: 3
 #| fig-width: 7
-vis_observed_vs_predicted(reg_hurr, type = "hist", facet = T)
+vis_observed_vs_predicted(reg_hurr, type = "hist", facet = T) +
+  labs(x = nn("expected_deaths_diff"))
 ```
 
 ### Coefficients

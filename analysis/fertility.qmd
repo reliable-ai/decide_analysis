@@ -71,17 +71,20 @@ vis_observed_vs_predicted(reg_fert)
 ```
 
 ```{r fertility-regression-observed-predicted-kde}
-vis_observed_vs_predicted(reg_fert, type = "kde")
+vis_observed_vs_predicted(reg_fert, type = "kde") +
+  labs(x = nn("fertility_low_estimate"))
 ```
 
 ```{r fertility-regression-observed-predicted-hist-overlapping}
-vis_observed_vs_predicted(reg_fert, type = "hist")
+vis_observed_vs_predicted(reg_fert, type = "hist") +
+  labs(x = nn("fertility_low_estimate"))
 ```
 
 ```{r fertility-regression-observed-predicted-hist}
 #| fig-height: 3
 #| fig-width: 7
-vis_observed_vs_predicted(reg_fert, type = "hist", facet = T)
+vis_observed_vs_predicted(reg_fert, type = "hist", facet = T) +
+  labs(x = nn("fertility_low_estimate"))
 ```
 
 ```{r fertility-regression-coefficients}

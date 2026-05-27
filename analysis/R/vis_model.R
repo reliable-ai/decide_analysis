@@ -84,7 +84,7 @@ vis_observed_vs_predicted <- function(reg_result, type = c("scatter", "hist", "k
         ggplot(aes(x = value, fill = source, colour = source)) +
         geom_histogram(alpha = 0.5, position = "identity") +
         labs(
-          x = "Expected Difference in Deaths (Feminine - Masculine)",
+          x = "Value",
           y = "Count",
           fill = NULL,
           colour = NULL
@@ -101,7 +101,7 @@ vis_observed_vs_predicted <- function(reg_result, type = c("scatter", "hist", "k
         ggplot(aes(x = value, fill = source, colour = source)) +
         geom_density(alpha = 0.3) +
         labs(
-          x = "Expected Difference in Deaths (Feminine - Masculine)",
+          x = "Value",
           y = "Density",
           fill = NULL,
           colour = NULL
