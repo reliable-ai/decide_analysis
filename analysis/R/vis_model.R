@@ -8,21 +8,21 @@ vis_residuals_vs_fitted <- function(reg_result) {
     ggplot(aes(x = fitted, y = residuals)) +
     geom_hline(yintercept = 0, linetype = "dashed", colour = "grey50") +
     geom_point(alpha = 0.6) +
-    geom_smooth(method = "loess", se = FALSE, colour = "steelblue") +
+    geom_smooth(method = "loess", se = FALSE, colour = col_fitted_line) +
     labs(x = "Fitted values", y = "Residuals") +
     theme_classic()
 }
 
 # vis_observed_vs_predicted <- function(reg_result, type = c("scatter", "hist", "kde"), facet = FALSE) {
 #   type <- match.arg(type)
-# 
+#
 #   col_name <- names(reg_result$model)[[1]]
-# 
+#
 #   df <- tibble(
 #     observed = reg_result$model[[1]],
 #     predicted = fitted(reg_result)
 #   )
-# 
+#
 #   if (type == "scatter") {
 #     df |>
 #       ggplot(aes(x = predicted, y = observed)) +
@@ -33,7 +33,7 @@ vis_residuals_vs_fitted <- function(reg_result) {
 #   } else {
 #     df_long <- df |>
 #       pivot_longer(cols = c(observed, predicted), names_to = "source", values_to = "value")
-# 
+#
 #     if (type == "hist") {
 #       p <- df_long |>
 #         ggplot(aes(x = value, fill = source, colour = source)) +
@@ -47,7 +47,7 @@ vis_residuals_vs_fitted <- function(reg_result) {
 #         labs(x = col_name, y = "Density", fill = NULL, colour = NULL) +
 #         theme_classic()
 #     }
-# 
+#
 #     if (facet) p <- p + facet_wrap(~source) + theme(legend.position = "none")
 #     p
 #   }
@@ -55,16 +55,16 @@ vis_residuals_vs_fitted <- function(reg_result) {
 
 vis_observed_vs_predicted <- function(reg_result, type = c("scatter", "hist", "kde"), facet = FALSE) {
   type <- match.arg(type)
-  
+
   col_name <- names(reg_result$model)[[1]]
-  
+
   df <- tibble(
     observed = reg_result$model[[1]],
     predicted = fitted(reg_result)
   )
-  
-  text_size <- 16 
-  
+
+  text_size <- 16
+
   if (type == "scatter") {
     df |>
       ggplot(aes(x = predicted, y = observed)) +
@@ -75,18 +75,18 @@ vis_observed_vs_predicted <- function(reg_result, type = c("scatter", "hist", "k
   } else {
     df_long <- df |>
       pivot_longer(cols = c(observed, predicted), names_to = "source", values_to = "value")
-    
-    custom_colors <- c("observed" = "#E69F00", "predicted" = "#56B4E9") 
+
+    custom_colors <- col_obs_pred
     custom_labels <- c("observed" = "Observed", "predicted" = "Predicted")
-    
+
     if (type == "hist") {
       p <- df_long |>
         ggplot(aes(x = value, fill = source, colour = source)) +
         geom_histogram(alpha = 0.5, position = "identity") +
         labs(
-          x = "Expected Difference in Deaths (Feminine - Masculine)", 
-          y = "Count", 
-          fill = NULL, 
+          x = "Expected Difference in Deaths (Feminine - Masculine)",
+          y = "Count",
+          fill = NULL,
           colour = NULL
         ) +
         scale_fill_manual(values = custom_colors, labels = custom_labels) +
@@ -101,9 +101,9 @@ vis_observed_vs_predicted <- function(reg_result, type = c("scatter", "hist", "k
         ggplot(aes(x = value, fill = source, colour = source)) +
         geom_density(alpha = 0.3) +
         labs(
-          x = "Expected Difference in Deaths (Feminine - Masculine)", 
-          y = "Density", 
-          fill = NULL, 
+          x = "Expected Difference in Deaths (Feminine - Masculine)",
+          y = "Density",
+          fill = NULL,
           colour = NULL
         ) +
         scale_fill_manual(values = custom_colors, labels = custom_labels) +
@@ -114,7 +114,7 @@ vis_observed_vs_predicted <- function(reg_result, type = c("scatter", "hist", "k
           legend.background = element_blank()     # Makes legend background transparent
         )
     }
-    
+
     if (facet) p <- p + facet_wrap(~source) + theme(legend.position = "none")
     p
   }
