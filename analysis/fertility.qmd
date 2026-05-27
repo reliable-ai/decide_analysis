@@ -63,6 +63,8 @@ reg_fert |>
 ```
 
 ```{r fertility-regression-residuals-fitted}
+#| fig-height: 5
+#| fig-width: 6
 vis_residuals_vs_fitted(reg_fert)
 ```
 
@@ -81,8 +83,8 @@ vis_observed_vs_predicted(reg_fert, type = "hist") +
 ```
 
 ```{r fertility-regression-observed-predicted-hist}
-#| fig-height: 3
-#| fig-width: 7
+#| fig-height: 5
+#| fig-width: 10
 vis_observed_vs_predicted(reg_fert, type = "hist", facet = T) +
   labs(x = nn("fertility_low_estimate"))
 ```

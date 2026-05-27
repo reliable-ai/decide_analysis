@@ -60,6 +60,8 @@ reg_hurr |>
 
 
 ```{r hurricane-regression-residuals-fitted}
+#| fig-height: 5
+#| fig-width: 6
 vis_residuals_vs_fitted(reg_hurr)
 ```
 
@@ -79,8 +81,8 @@ vis_observed_vs_predicted(reg_hurr, type = "hist") +
 
 
 ```{r hurricane-regression-observed-predicted-hist}
-#| fig-height: 3
-#| fig-width: 7
+#| fig-height: 5
+#| fig-width: 10
 vis_observed_vs_predicted(reg_hurr, type = "hist", facet = T) +
   labs(x = nn("expected_deaths_diff"))
 ```
