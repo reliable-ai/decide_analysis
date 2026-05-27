@@ -195,8 +195,7 @@ ablation_fert$inter_method_stability_summary |>
 ```{r fertility-ablation-inter-method-plot}
 #| fig-width: 6
 #| fig-height: 4.5
-vis_inter_method_stability(ablation_fert$inter_method_stability_summary) +
-  theme(legend.position = "none")
+vis_inter_method_stability(ablation_fert$inter_method_stability_summary)
 ```
 
 ## Intra-method stability
