@@ -7,15 +7,41 @@ format: pdf
 source("R/_load.R")
 ```
 
+```{r orben-helpers}
+# mv_dim_y_variable is a comma-separated list of individual wellbeing variable
+# names used in a given universe.  Having thousands of unique combinations makes
+# every downstream method intractable.  We one-hot encode the individual
+# variables instead: each unique item gets its own mv_dim_y_<name> binary
+# column (1 = included, 0 = excluded), and the original string column is
+# dropped.
+expand_y_variable <- function(mv, dim_prefix = "mv_dim_",
+                               col = "mv_dim_y_variable") {
+  if (!col %in% names(mv)) return(mv)
+
+  all_vars <- sort(unique(trimws(unlist(strsplit(as.character(mv[[col]]), ",")))))
+
+  for (v in all_vars) {
+    new_col <- paste0(dim_prefix, "y_", v)
+    mv[[new_col]] <- as.integer(
+      sapply(strsplit(as.character(mv[[col]]), ",\\s*"), function(x) v %in% trimws(x))
+    )
+  }
+
+  mv |> select(-all_of(col))
+}
+```
+
 This document analyses the three multiverse datasets from Orben & Przybylski (2019, *Nature Human Behaviour*): MCS Total, MTF, and YRBS.
 The outcome metric used throughout is the regression effect size (`effect`).
+`mv_dim_y_variable` is expanded into per-variable binary indicator columns before any analysis.
 
 ---
 
 # MCS Total
 
 ```{r mcs-load-data}
-mv_mcs <- load_multiverse("orben2019nhb_mcs_total")
+mv_mcs <- load_multiverse("orben2019nhb_mcs_total") |>
+  expand_y_variable()
 mv_mcs
 ```
 
@@ -210,7 +236,8 @@ vis_intra_method_stability(ablation_mcs$intra_method_stability_summary)
 # MTF
 
 ```{r mtf-load-data}
-mv_mtf <- load_multiverse("orben2019nhb_mtf")
+mv_mtf <- load_multiverse("orben2019nhb_mtf") |>
+  expand_y_variable()
 mv_mtf
 ```
 
@@ -245,8 +272,6 @@ reg_mtf |>
 #### Model Fit
 
 ```{r mtf-regression-model-check}
-#| fig-width: 9
-#| fig-height: 12
 reg_mtf |>
   check_model()
 ```
@@ -405,7 +430,8 @@ vis_intra_method_stability(ablation_mtf$intra_method_stability_summary)
 # YRBS
 
 ```{r yrbs-load-data}
-mv_yrbs <- load_multiverse("orben2019nhb_yrbs")
+mv_yrbs <- load_multiverse("orben2019nhb_yrbs") |>
+  expand_y_variable()
 mv_yrbs
 ```
 
