@@ -470,12 +470,24 @@ def total_variance_decomposition(multiverse_results: pd.MultiIndex,
             group_vars  = pd.Series([multiverse_results[perf_col].var(ddof=0)])  # use population variance for within-group variance
             group_means = pd.Series([multiverse_results[perf_col].mean()])
 
+        # main effect Var(E[Y|X_target]): group by target_dim itself (rather
+        # than the other dims) and take the variance of those group means.
+        # Note this is NOT the same as var_of_expected_values_across_groups
+        # above, which groups by the other dims and therefore equals the main
+        # effect of the *complement* of target_dim, not of target_dim itself.
+        target_group_means = multiverse_results[perf_col].groupby(
+            multiverse_results[(target_dim, "dimension")]
+        ).mean()
+        main_effect = np.var(target_group_means, ddof=0)
+
         variance_decomposition[target_dim] = {
             "var_total": var_total,
-            # E[Var(Y|X)]: mean of within-group variances
+            # E[Var(Y|X)]: mean of within-group variances = total effect of target_dim
             "expected_var_within_groups": np.mean(group_vars),
             # Var(E[Y|X]): population variance (ddof=0) of group means, matching np.var default
             "var_of_expected_values_across_groups": np.var(group_means),
+            # Var(E[Y|X_target]): true main effect of target_dim
+            "main_effect": main_effect,
         }
 
     return variance_decomposition
@@ -598,14 +610,181 @@ def total_variance_decomposition_with_interactions(
                 group_vars  = pd.Series([multiverse_results[perf_col].var(ddof=0)])  # use population variance for within-group variance
                 group_means = pd.Series([multiverse_results[perf_col].mean()])
 
+            # main effect Var(E[Y|X_target]): group by the target dims
+            # themselves (rather than the other dims) and take the variance
+            # of those group means. Note this is NOT the same as
+            # var_of_expected_values_across_groups above, which groups by the
+            # other dims and therefore equals the main effect of the
+            # *complement* of target_dims, not of target_dims itself.
+            target_dim_cols = [(d, "dimension") for d in target_dims]
+            target_group_means = multiverse_results[perf_col].groupby(
+                [multiverse_results[col] for col in target_dim_cols]
+            ).mean()
+            main_effect = np.var(target_group_means, ddof=0)
+
             # use a tuple key for all entries so single and multi-dim keys are
             # the same type and interaction keys are unambiguous
             variance_decomposition[target_dims] = {
                 "var_total": var_total,
-                # E[Var(Y|X)]: mean of within-group variances
+                # E[Var(Y|X)]: mean of within-group variances = total effect of target_dims
                 "expected_var_within_groups": np.mean(group_vars),
                 # Var(E[Y|X]): population variance (ddof=0) of group means
                 "var_of_expected_values_across_groups": np.var(group_means),
+                # Var(E[Y|X_target]): true main effect of target_dims
+                "main_effect": main_effect,
             }
 
     return variance_decomposition
+
+def generalized_main_effect(
+    multiverse_results: pd.DataFrame,
+    performance_metric: str,
+    max_order: int = None,
+) -> dict:
+    """
+    Computes GME(S) = Var(E[Y|X_S]) for every non-empty subset S of judgment
+    calls, directly from the universes that were actually evaluated.
+
+    Unlike total_variance_decomposition_with_interactions, this makes no
+    assumption that the multiverse is a full-factorial (balanced) design.
+    Some judgment calls may only unlock certain choices conditional on an
+    upstream decision (e.g. s1=2 unlocking an extra choice for s2 that
+    s1=1 does not have), so groups formed by conditioning on S can legitimately
+    differ in size across the values of S. GME(S) only requires grouping the
+    real universes by their realized values of S and taking the variance of
+    the resulting group means, so it is well-defined regardless of whether
+    those groups are the same size.
+
+    Args:
+        multiverse_results (pd.DataFrame): DataFrame with MultiIndex columns
+            (name, "dimension"|"performance_metric"), as produced by
+            organize_multiverse_results.
+        performance_metric (str): Name of the performance metric to analyze.
+        max_order (int, optional): Largest subset size to compute GME for.
+            Defaults to considering every judgment call (i.e. the full power
+            set of dimensions).
+
+    Returns:
+        dict: mapping each non-empty tuple of judgment call names to its
+            GME (a float).
+    """
+    dimension_cols = [col for col in multiverse_results.columns
+                      if col[1] == "dimension"]
+    dimension_names = [col[0] for col in dimension_cols]
+
+    perf_col = (performance_metric, "performance_metric")
+
+    if max_order is None:
+        max_order = len(dimension_names)
+
+    gme = {}
+    for size in range(1, max_order + 1):
+        for target_dims in combinations(dimension_names, size):
+            target_dim_cols = [(d, "dimension") for d in target_dims]
+            group_means = multiverse_results[perf_col].groupby(
+                [multiverse_results[col] for col in target_dim_cols]
+            ).mean()
+            gme[target_dims] = np.var(group_means, ddof=0)
+
+    return gme
+
+def catchy_name_total_effect(
+    multiverse_results: pd.DataFrame,
+    performance_metric: str,
+    max_order: int = None,
+) -> dict:
+    """
+    Computes CATCHY_NAME(S), the total effect of judgment call subset S, for
+    every non-empty S, extended to multiverses where the tree is ragged (some
+    judgment calls unlock extra choices only under specific upstream
+    decisions, so a background context does not always have a real outcome
+    for every possible choice of S).
+
+    For a realized background context p_{-S} (a combination of every
+    judgment call not in S), the comparable set should contain one outcome
+    for every combination of S's choices that occurs anywhere in the
+    multiverse. When a particular combination was never actually evaluated
+    under that specific background context, it is replaced by the
+    average-case counterfactual: the plain, unconditioned mean of Y over
+    every real universe that does take that combination of S's choices,
+    regardless of anything else. This never fabricates a specific matched
+    universe; it only ever imputes with a directly-computable marginal mean,
+    so every comparable set ends up the same size and every context is
+    aggregated with equal weight.
+
+    Args:
+        multiverse_results (pd.DataFrame): DataFrame with MultiIndex columns
+            (name, "dimension"|"performance_metric"), as produced by
+            organize_multiverse_results.
+        performance_metric (str): Name of the performance metric to analyze.
+        max_order (int, optional): Largest subset size to compute
+            CATCHY_NAME for. Defaults to considering every judgment call
+            (the full power set of dimensions).
+
+    Returns:
+        dict: mapping each non-empty tuple of judgment call names to its
+            CATCHY_NAME total effect (a float).
+    """
+    dimension_cols = [col for col in multiverse_results.columns
+                      if col[1] == "dimension"]
+    dimension_names = [col[0] for col in dimension_cols]
+
+    perf_col = (performance_metric, "performance_metric")
+
+    if max_order is None:
+        max_order = len(dimension_names)
+
+    catchy_name = {}
+    for size in range(1, max_order + 1):
+        for target_dims in combinations(dimension_names, size):
+            target_dim_cols = [(d, "dimension") for d in target_dims]
+            other_dims = [d for d in dimension_names if d not in target_dims]
+            other_dim_cols = [(d, "dimension") for d in other_dims]
+
+            if not other_dim_cols:
+                # target_dims covers every decision: there is only one
+                # background context (the whole dataset), and every
+                # combination of target_dims is real by construction.
+                catchy_name[target_dims] = float(
+                    multiverse_results[perf_col].var(ddof=0)
+                )
+                continue
+
+            # average-case counterfactual for every combination of
+            # target_dims' choices that occurs anywhere in the multiverse:
+            # E[Y | X_target = combo], unconditioned on anything else.
+            # This also defines the full comparable-set space -- combinations
+            # of target_dims that never occur anywhere are not considered,
+            # since there is no data to ground them in.
+            grouped_means = multiverse_results[perf_col].groupby(
+                [multiverse_results[col] for col in target_dim_cols]
+            ).mean()
+            # normalize keys to tuples explicitly: groupby collapses a
+            # single-column key to a bare scalar Index rather than a
+            # 1-element-tuple MultiIndex, which would otherwise silently
+            # mismatch against the tuple keys built from itertuples() below
+            if len(target_dim_cols) == 1:
+                imputed_means = {(k,): v for k, v in grouped_means.items()}
+            else:
+                imputed_means = grouped_means.to_dict()
+            full_combo_space = list(imputed_means.keys())
+
+            phi_values = []
+            for context, context_rows in multiverse_results.groupby(
+                [multiverse_results[col] for col in other_dim_cols]
+            ):
+                real_by_combo = dict(zip(
+                    context_rows[target_dim_cols].itertuples(index=False, name=None),
+                    context_rows[perf_col],
+                ))
+                comparable_set = [
+                    real_by_combo[combo] if combo in real_by_combo
+                    else imputed_means[combo]
+                    for combo in full_combo_space
+                ]
+                phi_values.append(np.var(comparable_set, ddof=0))
+
+            # equal weight per background context (default aggregation)
+            catchy_name[target_dims] = float(np.mean(phi_values))
+
+    return catchy_name
