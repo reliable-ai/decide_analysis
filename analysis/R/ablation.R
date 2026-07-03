@@ -1,6 +1,5 @@
 calc_fanova_main_effects <- function (mv, colname_metric, dim_prefix = "mv_dim_") {
-  calc_fanova(mv, colname_metric, dim_prefix = dim_prefix) |>
-    filter(is.na(level_1)) |>
+  calc_fanova(mv, colname_metric, dim_prefix = dim_prefix, use_individual = TRUE) |>
     fanova_to_vec()
 }
 
@@ -18,6 +17,7 @@ tidy_importance_methods <- function (importance_by_method, dim_prefix = "mv_dim_
   )
 }
 
+# Default to using individual for better comparability
 calc_importance_methods <- function (mv, colname_metric, dim_prefix = "mv_dim_") {
   list(
     regression = calc_regression_importance(mv, colname_metric, dim_prefix = dim_prefix),

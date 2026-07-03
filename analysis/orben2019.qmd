@@ -127,7 +127,7 @@ vis_importance(regimp_mcs)
 ### FANOVA
 
 ```{r mcs-fanova-fit}
-fanova_mcs <- calc_fanova(mv_mcs, colname_metric = "effect")
+fanova_mcs <- calc_fanova(mv_mcs, colname_metric = "effect", use_individual = TRUE)
 fanova_mcs
 ```
 
@@ -142,7 +142,6 @@ Only main effects
 
 ```{r mcs-fanova-main-effects-plot}
 fanova_mcs |>
-  filter(is.na(level_1)) |>
   head(10) |>
   fanova_to_vec() |>
   vis_importance()
@@ -321,7 +320,7 @@ vis_importance(regimp_mtf)
 ### FANOVA
 
 ```{r mtf-fanova-fit}
-fanova_mtf <- calc_fanova(mv_mtf, colname_metric = "effect")
+fanova_mtf <- calc_fanova(mv_mtf, colname_metric = "effect", use_individual = TRUE)
 fanova_mtf
 ```
 
@@ -332,19 +331,9 @@ fanova_mtf |>
   vis_importance()
 ```
 
-Only main effects
-
-```{r mtf-fanova-main-effects-plot}
-fanova_mtf |>
-  filter(is.na(level_1)) |>
-  head(10) |>
-  fanova_to_vec() |>
-  vis_importance()
-```
-
 ## Our Framework
 
-```{r mtf-within-bucket}
+```{r mtf-within-bucket} 
 within_mtf <- calc_within_bucket_variation(mv_mtf, colname_metric = "effect")
 within_mtf
 ```
@@ -517,7 +506,7 @@ vis_importance(regimp_yrbs)
 ### FANOVA
 
 ```{r yrbs-fanova-fit}
-fanova_yrbs <- calc_fanova(mv_yrbs, colname_metric = "effect")
+fanova_yrbs <- calc_fanova(mv_yrbs, colname_metric = "effect", use_individual = TRUE)
 fanova_yrbs
 ```
 
