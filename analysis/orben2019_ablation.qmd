@@ -7,24 +7,6 @@ format: pdf
 source("R/_load.R")
 ```
 
-```{r orben-helpers}
-expand_y_variable <- function(mv, dim_prefix = "mv_dim_",
-                               col = "mv_dim_y_variable") {
-  if (!col %in% names(mv)) return(mv)
-
-  all_vars <- sort(unique(trimws(unlist(strsplit(as.character(mv[[col]]), ",")))))
-
-  for (v in all_vars) {
-    new_col <- paste0(dim_prefix, "y_", v)
-    mv[[new_col]] <- as.integer(
-      sapply(strsplit(as.character(mv[[col]]), ",\\s*"), function(x) v %in% trimws(x))
-    )
-  }
-
-  mv |> select(-all_of(col))
-}
-```
-
 This document contains the ablation studies for the three multiverse datasets
 from Orben & Przybylski (2019, *Nature Human Behaviour*): MCS Total, MTF, and
 YRBS.  For each dataset, every decision is fixed to one option in turn,
@@ -44,7 +26,14 @@ mv_mcs <- load_multiverse("orben2019nhb_mcs_total") |>
 ## Ablation Study
 
 ```{r mcs-ablation-run}
-ablation_mcs <- run_ablation_analysis(mv_mcs, colname_metric = "effect")
+ablation_mcs <- run_ablation_analysis(
+  mv_mcs,
+  colname_metric = "effect",
+  post_process_importances = function(imp) {
+     imp |> 
+      aggregate_onehot_importances()
+  }
+)
 ```
 
 ### Inter-method stability

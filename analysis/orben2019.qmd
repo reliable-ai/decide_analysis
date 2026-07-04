@@ -7,30 +7,6 @@ format: pdf
 source("R/_load.R")
 ```
 
-```{r orben-helpers}
-# mv_dim_y_variable is a comma-separated list of individual wellbeing variable
-# names used in a given universe.  Having thousands of unique combinations makes
-# every downstream method intractable.  We one-hot encode the individual
-# variables instead: each unique item gets its own mv_dim_y_<name> binary
-# column (1 = included, 0 = excluded), and the original string column is
-# dropped.
-expand_y_variable <- function(mv, dim_prefix = "mv_dim_",
-                               col = "mv_dim_y_variable") {
-  if (!col %in% names(mv)) return(mv)
-
-  all_vars <- sort(unique(trimws(unlist(strsplit(as.character(mv[[col]]), ",")))))
-
-  for (v in all_vars) {
-    new_col <- paste0(dim_prefix, "y_", v)
-    mv[[new_col]] <- as.integer(
-      sapply(strsplit(as.character(mv[[col]]), ",\\s*"), function(x) v %in% trimws(x))
-    )
-  }
-
-  mv |> select(-all_of(col))
-}
-```
-
 This document analyses the three multiverse datasets from Orben & Przybylski (2019, *Nature Human Behaviour*): MCS Total, MTF, and YRBS.
 The outcome metric used throughout is the regression effect size (`effect`).
 `mv_dim_y_variable` is expanded into per-variable binary indicator columns before any analysis.
@@ -116,7 +92,8 @@ vis_regression_coefficients(reg_mcs)
 #### Importance
 
 ```{r mcs-regression-importance}
-regimp_mcs <- calc_regression_importance(mv_mcs, colname_metric = "effect")
+regimp_mcs <- calc_regression_importance(mv_mcs, colname_metric = "effect") |> 
+  aggregate_onehot_importances()
 regimp_mcs
 ```
 
@@ -135,22 +112,15 @@ fanova_mcs
 fanova_mcs |>
   head(10) |>
   fanova_to_vec() |>
-  vis_importance()
-```
-
-Only main effects
-
-```{r mcs-fanova-main-effects-plot}
-fanova_mcs |>
-  head(10) |>
-  fanova_to_vec() |>
+  aggregate_onehot_importances() |> 
   vis_importance()
 ```
 
 ## Our Framework
 
 ```{r mcs-within-bucket}
-within_mcs <- calc_within_bucket_variation(mv_mcs, colname_metric = "effect")
+within_mcs <- calc_within_bucket_variation(mv_mcs, colname_metric = "effect") |> 
+  aggregate_onehot_importances()
 within_mcs
 ```
 
@@ -159,7 +129,8 @@ vis_importance(within_mcs)
 ```
 
 ```{r mcs-between-bucket}
-between_mcs <- calc_between_bucket_variation(mv_mcs, colname_metric = "effect")
+between_mcs <- calc_between_bucket_variation(mv_mcs, colname_metric = "effect") |> 
+  aggregate_onehot_importances()
 between_mcs
 ```
 
@@ -255,7 +226,8 @@ vis_regression_coefficients(reg_mtf)
 #### Importance
 
 ```{r mtf-regression-importance}
-regimp_mtf <- calc_regression_importance(mv_mtf, colname_metric = "effect")
+regimp_mtf <- calc_regression_importance(mv_mtf, colname_metric = "effect") |> 
+  aggregate_onehot_importances()
 regimp_mtf
 ```
 
@@ -273,14 +245,16 @@ fanova_mtf
 ```{r mtf-fanova-importance-plot}
 fanova_mtf |>
   head(10) |>
-  fanova_to_vec() |>
+  fanova_to_vec() |> 
+  aggregate_onehot_importances() |>
   vis_importance()
 ```
 
 ## Our Framework
 
 ```{r mtf-within-bucket} 
-within_mtf <- calc_within_bucket_variation(mv_mtf, colname_metric = "effect")
+within_mtf <- calc_within_bucket_variation(mv_mtf, colname_metric = "effect") |> 
+  aggregate_onehot_importances()
 within_mtf
 ```
 
@@ -289,7 +263,8 @@ vis_importance(within_mtf)
 ```
 
 ```{r mtf-between-bucket}
-between_mtf <- calc_between_bucket_variation(mv_mtf, colname_metric = "effect")
+between_mtf <- calc_between_bucket_variation(mv_mtf, colname_metric = "effect") |> 
+  aggregate_onehot_importances()
 between_mtf
 ```
 
@@ -302,7 +277,8 @@ vis_importance(between_mtf)
 ```{r mtf-combine-importance}
 vis_importance_2dim(
   between_mtf,
-  fanova_mtf |> fanova_to_vec()
+  fanova_mtf |> fanova_to_vec() |> 
+  aggregate_onehot_importances()
 )
 ```
 
@@ -387,7 +363,8 @@ vis_regression_coefficients(reg_yrbs)
 #### Importance
 
 ```{r yrbs-regression-importance}
-regimp_yrbs <- calc_regression_importance(mv_yrbs, colname_metric = "effect")
+regimp_yrbs <- calc_regression_importance(mv_yrbs, colname_metric = "effect") |> 
+  aggregate_onehot_importances()
 regimp_yrbs
 ```
 
@@ -405,14 +382,16 @@ fanova_yrbs
 ```{r yrbs-fanova-importance-plot}
 fanova_yrbs |>
   head(10) |>
-  fanova_to_vec() |>
+  fanova_to_vec() |> 
+  aggregate_onehot_importances() |>
   vis_importance()
 ```
 
 ## Our Framework
 
 ```{r yrbs-within-bucket}
-within_yrbs <- calc_within_bucket_variation(mv_yrbs, colname_metric = "effect")
+within_yrbs <- calc_within_bucket_variation(mv_yrbs, colname_metric = "effect") |> 
+  aggregate_onehot_importances()
 within_yrbs
 ```
 
@@ -421,7 +400,8 @@ vis_importance(within_yrbs)
 ```
 
 ```{r yrbs-between-bucket}
-between_yrbs <- calc_between_bucket_variation(mv_yrbs, colname_metric = "effect")
+between_yrbs <- calc_between_bucket_variation(mv_yrbs, colname_metric = "effect") |> 
+  aggregate_onehot_importances()
 between_yrbs
 ```
 
@@ -434,6 +414,7 @@ vis_importance(between_yrbs)
 ```{r yrbs-combine-importance}
 vis_importance_2dim(
   between_yrbs,
-  fanova_yrbs |> fanova_to_vec()
+  fanova_yrbs |> fanova_to_vec() |> 
+  aggregate_onehot_importances()
 )
 ```

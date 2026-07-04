@@ -18,12 +18,20 @@ tidy_importance_methods <- function (importance_by_method, dim_prefix = "mv_dim_
 }
 
 # Default to using individual for better comparability
-calc_importance_methods <- function (mv, colname_metric, dim_prefix = "mv_dim_") {
+calc_importance_methods <- function (mv, colname_metric, dim_prefix = "mv_dim_", post_process_importances = NULL) {
+  if (is.null(post_process_importances)) {
+    post_process_importances = function (x) { return(x) }
+  }
+
   list(
-    regression = calc_regression_importance(mv, colname_metric, dim_prefix = dim_prefix),
-    fanova = calc_fanova_main_effects(mv, colname_metric, dim_prefix = dim_prefix),
-    within = calc_within_bucket_variation(mv, colname_metric, dim_prefix = dim_prefix),
-    between = calc_between_bucket_variation(mv, colname_metric, dim_prefix = dim_prefix)
+    regression = calc_regression_importance(mv, colname_metric, dim_prefix = dim_prefix) |>
+      post_process_importances(),
+    fanova = calc_fanova_main_effects(mv, colname_metric, dim_prefix = dim_prefix) |>
+      post_process_importances(),
+    within = calc_within_bucket_variation(mv, colname_metric, dim_prefix = dim_prefix) |>
+      post_process_importances(),
+    between = calc_between_bucket_variation(mv, colname_metric, dim_prefix = dim_prefix) |>
+      post_process_importances()
   )
 }
 
@@ -78,7 +86,12 @@ build_ablation_grid <- function (mv, dim_prefix = "mv_dim_") {
   )
 }
 
-calc_ablation_importance <- function (mv, colname_metric, dim_prefix = "mv_dim_") {
+calc_ablation_importance <- function (
+  mv,
+  colname_metric,
+  dim_prefix = "mv_dim_",
+  post_process_importances = NULL
+) {
   ablation_grid <- build_ablation_grid(mv, dim_prefix = dim_prefix)
 
   purrr::pmap_dfr(
@@ -95,7 +108,8 @@ calc_ablation_importance <- function (mv, colname_metric, dim_prefix = "mv_dim_"
         calc_importance_methods(
           ablated_mv,
           colname_metric = colname_metric,
-          dim_prefix = dim_prefix
+          dim_prefix = dim_prefix,
+          post_process_importances = post_process_importances
         ),
         dim_prefix = dim_prefix
       ) |>
