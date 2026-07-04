@@ -409,16 +409,6 @@ fanova_yrbs |>
   vis_importance()
 ```
 
-Only main effects
-
-```{r yrbs-fanova-main-effects-plot}
-fanova_yrbs |>
-  filter(is.na(level_1)) |>
-  head(10) |>
-  fanova_to_vec() |>
-  vis_importance()
-```
-
 ## Our Framework
 
 ```{r yrbs-within-bucket}
