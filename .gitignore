@@ -32,3 +32,6 @@ images/
 analysis/*_files/
 analysis/*.pdf
 analysis/*.html
+
+# notes
+notes/

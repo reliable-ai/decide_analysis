@@ -1,0 +1,289 @@
+---
+title: Toy Simulations
+---
+
+R port of `toy_examples.ipynb`. Where the notebook uses scikit-learn, this uses
+`lm()` and `ranger()`; see the note at the bottom on which numbers are expected
+to agree exactly with the notebook and which are implementation-specific.
+
+We would like to show that our framework/method elegantly handles cases where surrogate model-based decision importances fail.
+In particular, we consider toy multiverses that poke holes in how regression and random forests handle decision importances.
+
+```{r}
+#| label: setup
+#| message: false
+library(tidyverse)
+library(ranger)
+```
+
+```{r}
+#| label: helpers
+# sklearn's mean_squared_error() and r2_score()
+mse <- function (actual, pred) mean((actual - pred)^2)
+r2 <- function (actual, pred) {
+  1 - sum((actual - pred)^2) / sum((actual - mean(actual))^2)
+}
+
+# RandomForestRegressor(n_estimators = 100, random_state = 42, bootstrap = ...):
+# sklearn considers every feature at each split for regressors
+# (max_features = 1.0) and grows trees out fully, neither of which is ranger's
+# default. sample.fraction = 1 keeps the full multiverse in every tree.
+fit_rf <- function (x, y, bootstrap = FALSE, seed = 42) {
+  ranger(
+    x = x, y = y,
+    num.trees = 100,
+    mtry = ncol(x),
+    min.node.size = 1,
+    replace = bootstrap,
+    sample.fraction = 1,
+    importance = "impurity",
+    seed = seed
+  )
+}
+
+predict_rf <- function (model, x) predict(model, data = x)$predictions
+
+# sklearn's feature_importances_ normalises the total impurity decrease to sum
+# to 1; ranger's "impurity" importance is unnormalised
+mdi <- function (model) {
+  imp <- ranger::importance(model)
+  imp / sum(imp)
+}
+
+# sklearn's permutation_importance(n_repeats = 50, random_state = 42,
+# scoring = "neg_mean_squared_error"): the mean increase in MSE when a single
+# column is shuffled, so a bigger drop in performance = higher importance
+permutation_importance <- function (model, x, y, n_repeats = 50, seed = 42) {
+  baseline <- mse(y, predict_rf(model, x))
+  set.seed(seed)
+  drops <- vapply(seq_len(ncol(x)), function (j) {
+    replicate(n_repeats, {
+      x_perm <- x
+      x_perm[, j] <- sample(x_perm[, j])
+      mse(y, predict_rf(model, x_perm)) - baseline
+    })
+  }, numeric(n_repeats))
+
+  tibble(
+    feature = colnames(x),
+    importance_mean = colMeans(drops),
+    # numpy's std(), i.e. the population standard deviation, as used for
+    # sklearn's importances_std
+    importance_sd = apply(drops, 2, \(d) sqrt(mean((d - mean(d))^2)))
+  )
+}
+
+print_pfi <- function (pfi) {
+  walk2(pfi$feature, seq_len(nrow(pfi)), \(f, i) {
+    cat(sprintf(
+      "%s: %.3f (std: %.3f)\n", f, pfi$importance_mean[i], pfi$importance_sd[i]
+    ))
+  })
+}
+```
+
+## Toy Multiverse #1
+### Regression Predictions Fail
+### RF Predictions Succeed; MDI Importances Fail; Permutation Importances Succeed
+
+Interactions can cause linear regression models to fail both in prediction and interpretation, assuming that the interaction terms are not all included. If the interaction terms are all included, this can also lead to the case where `p=n`, so the regression will perfectly interpolate the data, but the model will have zero residual degrees of freedom, making statistical inference impossible (i.e. no standard errors or p-values can be calculated). Thus the only way around this problem is to know the interactions in advance, which is infeasible for large/complex multiverses.
+
+Since random forests are ensembles of rule-based models, they handle the multiverses with a high amount of accuracy. In fact, if we set `bootstrap=False` (since we observe the full multiverse), then it will often get perfect predictive accuracy. However, MDI importances, which are the most popular form of tree-based importance, will fail. This is because for each possible initial split in a tree, each candidate feature yields a variance reduction of exactly 0.0, so the root node will get nothing. The tree is forced to arbitrarily pick one of the features to serve as the root node, and assuming it chooses `x1`, then `x1` will not receive any credit. However, if the researcher is savvy enough to know this is a potential issue, then permutation importance can be used and will sidestep this issue.
+
+The multiverse is shown here:
+
+![](toy_multiverse_1.png)
+
+```{r}
+#| label: toy1-data
+# simple multiverse from Figure 7 in our paper draft (appendix)
+x1 <- c(0, 0, 0, 1, 0, 1, 1, 1)
+x2 <- c(0, 0, 1, 0, 1, 0, 1, 1)
+x3 <- c(0, 1, 0, 0, 1, 1, 0, 1)
+toy1_X <- cbind(x1 = x1, x2 = x2, x3 = x3)
+toy1_y <- c(0.6, 0.7, 0.8, 0.9, 0.9, 0.8, 0.7, 0.6)
+```
+
+```{r}
+#| label: toy1-lm
+toy1_lm <- lm(toy1_y ~ x1 + x2 + x3)
+toy1_lm_pred <- unname(predict(toy1_lm))
+cat("-- Coefficients --\n")
+print(coef(toy1_lm)[-1])
+cat("-- Intercept --\n")
+print(unname(coef(toy1_lm)[1]))
+cat("-- Metrics --\n")
+cat("Mean Squared Error: ", mse(toy1_y, toy1_lm_pred), "\n")
+cat("R^2 Score: ", r2(toy1_y, toy1_lm_pred), "\n")
+cat("-- Predictions --\n")
+cat("Predictions: ", toy1_lm_pred, "\n")
+cat("Actual: ", toy1_y, "\n")
+```
+
+```{r}
+#| label: toy1-lm-poly
+# now fit a linear model that includes all interactions
+# (the saturated model, i.e. PolynomialFeatures(degree = 3,
+# interaction_only = TRUE) followed by a linear regression)
+toy1_lm_poly <- lm(toy1_y ~ x1 * x2 * x3)
+toy1_lm_poly_pred <- unname(predict(toy1_lm_poly))
+cat("-- Num. of Params --\n")
+cat("n =", nrow(toy1_X), "\n")
+cat("p =", length(coef(toy1_lm_poly)), "\n")  # includes the intercept
+cat("-- Coefficients --\n")
+print(coef(toy1_lm_poly)[-1])
+cat("-- Intercept --\n")
+print(unname(coef(toy1_lm_poly)[1]))
+cat("-- Metrics --\n")
+cat("Mean Squared Error: ", mse(toy1_y, toy1_lm_poly_pred), "\n")
+cat("R^2 Score: ", r2(toy1_y, toy1_lm_poly_pred), "\n")
+cat("-- Predictions --\n")
+cat("Predictions: ", toy1_lm_poly_pred, "\n")
+cat("Actual: ", toy1_y, "\n")
+```
+
+```{r}
+#| label: toy1-rf
+# fit a random forest model
+toy1_rf <- fit_rf(toy1_X, toy1_y, bootstrap = FALSE)
+toy1_rf_pred <- predict_rf(toy1_rf, toy1_X)
+toy1_rf_mdi <- mdi(toy1_rf)
+toy1_rf_pfi <- permutation_importance(toy1_rf, toy1_X, toy1_y, n_repeats = 50)
+cat("-- MDI Importance --\n")
+print(round(toy1_rf_mdi, 3))
+cat("\n-- Permutation Feature Importance --\n")
+print_pfi(toy1_rf_pfi)
+cat("-- Metrics --\n")
+cat("Mean Squared Error: ", mse(toy1_y, toy1_rf_pred), "\n")
+cat("R^2 Score: ", r2(toy1_y, toy1_rf_pred), "\n")
+cat("-- Predictions --\n")
+cat("Predictions: ", toy1_rf_pred, "\n")
+cat("Actual: ", toy1_y, "\n")
+```
+
+## Toy Multiverse #2
+### RF Predictions Work; Inference Doesn't
+
+We find a toy scenario where using RFs as a surrogate model fails: when some sort of independent noise is included. In particular, we find that the bias of random forests towards features with high cardinality/entropy can be exploited in the case where the signal is not 'pure' to make the random forest believe that a completely non-informative feature is more important than the signal feature. Although the predictions of the RF are still accurate, both the MDI importances and permutation importances fail to identify the signal feature. We test this with RFs both with and without bootstrap to be sure to cover our bases. Issue is that this is just moving around the signal-to-noise ratio, which could of course mess up any method, including ours. Need to try with ours to ensure that we are slightly more robust.
+
+```{r}
+#| label: toy2-data
+# Toy multiverse where only x1 matters. Feature x1 has a fixed effect of +0.05 on accuracy, while features x2 and x3 are pure noise.
+# To break the applicability of the random forest, we consider the case where there is some random noise outside of the included judgment calls.
+# This noise is independent from the features and is centered at zero, to properly reflect what measurement error could look like in a realistic natural sciences setting.
+
+# define the categories for each decision
+# signal feature (cardinality = 2)
+x1_opts <- c(0, 1)
+# noise feature (cardinality = 8)
+x2_opts <- 0:7
+# noise feature (cardinality = 2)
+x3_opts <- c(0, 1)
+
+# generate the full multiverse (2 * 8 * 2 = 32 universes)
+# expand.grid() varies its first argument fastest, so the arguments are reversed
+# to match the row order of itertools.product(x1_opts, x2_opts, x3_opts)
+toy2_X <- expand.grid(x3 = x3_opts, x2 = x2_opts, x1 = x1_opts) |>
+  select(x1, x2, x3) |>
+  as.matrix()
+
+# generate y
+# recall that x1 being 1 adds +0.05 to accuracy, while x2 and x3 do absolutely nothing
+# we add random error to reflect possible measurement error that could occur in a real-world setting
+#
+# these are the values of np.random.uniform(-0.05, 0.05, size = 32) under
+# np.random.seed(42): R's RNG cannot reproduce numpy's stream, so they are
+# transcribed verbatim to keep this multiverse identical to the notebook's
+noise <- c(
+  -0.012545988115263751, 0.045071430640991617, 0.023199394181140504,
+  0.0098658484197036572, -0.034398135955756352, -0.034400547966379737,
+  -0.044191638783180054, 0.036617614577493518, 0.010111501174320879,
+  0.020807257779604543, -0.047941550570419759, 0.046990985216199432,
+  0.033244264080042177, -0.028766088932172387, -0.031817503279289935,
+  -0.031659549014656618, -0.019575775704046228, 0.0024756431632237813,
+  -0.0068054981357884223, -0.02087708598019581, 0.011185289472237944,
+  -0.036050613934795819, -0.020785535146478185, -0.01336381567063083,
+  -0.0043930015782964044, 0.028517596139301368, -0.030032621784164028,
+  0.0014234438413611578, 0.009241456886204244, -0.04535495872800023,
+  0.010754485190143839, -0.032947587631270848
+)
+toy2_y <- if_else(toy2_X[, "x1"] == 1, 0.65, 0.60) + noise
+```
+
+```{r}
+#| label: toy2-rf-bootstrap
+# random forest WITH bootstrap
+toy2_rf_boot <- fit_rf(toy2_X, toy2_y, bootstrap = TRUE)
+toy2_rf_boot_pred <- predict_rf(toy2_rf_boot, toy2_X)
+toy2_rf_boot_mdi <- mdi(toy2_rf_boot)
+toy2_rf_boot_pfi <- permutation_importance(
+  toy2_rf_boot, toy2_X, toy2_y, n_repeats = 50
+)
+cat("-- MDI Importances --\n")
+cat(sprintf("x1 (signal feature): %.3f\n", toy2_rf_boot_mdi[["x1"]]))
+cat(sprintf("x2 (high cardinality noise feature): %.3f\n", toy2_rf_boot_mdi[["x2"]]))
+cat(sprintf("x3 (binary noise feature): %.3f\n", toy2_rf_boot_mdi[["x3"]]))
+cat("-- Permutation Feature Importance --\n")
+print_pfi(toy2_rf_boot_pfi)
+cat("-- Metrics --\n")
+cat("Mean Squared Error: ", mse(toy2_y, toy2_rf_boot_pred), "\n")
+cat("R^2 Score: ", r2(toy2_y, toy2_rf_boot_pred), "\n")
+cat("-- Predictions --\n")
+cat("Predictions: ", toy2_rf_boot_pred, "\n")
+cat("Actual: ", toy2_y, "\n")
+```
+
+```{r}
+#| label: toy2-rf-no-bootstrap
+# now time for random forest WITHOUT bootstrap
+toy2_rf_noboot <- fit_rf(toy2_X, toy2_y, bootstrap = FALSE)
+toy2_rf_noboot_pred <- predict_rf(toy2_rf_noboot, toy2_X)
+toy2_rf_noboot_mdi <- mdi(toy2_rf_noboot)
+toy2_rf_noboot_pfi <- permutation_importance(
+  toy2_rf_noboot, toy2_X, toy2_y, n_repeats = 50
+)
+cat("-- MDI Importances --\n")
+cat(sprintf("x1 (signal feature): %.3f\n", toy2_rf_noboot_mdi[["x1"]]))
+cat(sprintf("x2 (high cardinality noise feature): %.3f\n", toy2_rf_noboot_mdi[["x2"]]))
+cat(sprintf("x3 (binary noise feature): %.3f\n", toy2_rf_noboot_mdi[["x3"]]))
+cat("-- Permutation Feature Importance --\n")
+print_pfi(toy2_rf_noboot_pfi)
+cat("-- Metrics --\n")
+cat("Mean Squared Error: ", mse(toy2_y, toy2_rf_noboot_pred), "\n")
+cat("R^2 Score: ", r2(toy2_y, toy2_rf_noboot_pred), "\n")
+cat("-- Predictions --\n")
+cat("Predictions: ", toy2_rf_noboot_pred, "\n")
+cat("Actual: ", toy2_y, "\n")
+```
+
+## Agreement with `toy_examples.ipynb`
+
+Both multiverses are identical to the notebook's — `toy2_y` is bit-identical,
+since the noise vector is transcribed from numpy rather than redrawn — so every
+linear-model quantity agrees to floating point: coefficients, intercept, MSE,
+$R^2$ and fitted values.
+
+For the forests, whether the numbers agree depends on whether the fit is
+deterministic:
+
+- **Toy #2 without bootstrap.** ranger and scikit-learn build the same trees
+  here (every feature is considered at each split, trees are grown out fully,
+  and there is no resampling), so the results agree to six digits: MDI
+  0.375 / 0.564 / 0.061 in both, and both fit the multiverse exactly
+  ($R^2 = 1$, MSE $= 9.6 \times 10^{-31}$).
+- **Toy #2 with bootstrap.** Resampling is RNG-dependent, so the numbers move in
+  the third digit (MDI 0.399 / 0.455 / 0.146 here versus 0.400 / 0.444 / 0.156
+  in the notebook). The conclusion is unchanged: the high-cardinality noise
+  feature `x2` outranks the signal feature `x1`.
+- **Toy #1.** This is the one place the two implementations visibly disagree:
+  MDI is 0.34 / 0.54 / 0.12 here versus 0.03 / 0.80 / 0.17 in the notebook, so
+  the feature MDI shortchanges is `x3` here and `x1` there. That is the
+  phenomenon this section describes rather than a porting error — every
+  candidate root split reduces variance by exactly 0, so whichever feature lands
+  at the root is picked arbitrarily and receives no credit for it, and
+  scikit-learn and ranger break that tie differently. The MDI ranking is an
+  artefact of tie-breaking and does not reproduce across implementations (or
+  seeds), which is exactly why it cannot be trusted here. Permutation importance
+  is stable across both: it ranks `x1` first (0.026 / 0.023 / 0.005 here,
+  0.025 / 0.019 / 0.005 in the notebook), and both forests predict the
+  multiverse perfectly.
