@@ -1,5 +1,5 @@
 nn_register(c(
-  "between" = "CatchyName",
+  "between" = "DECIDE",
   "within" = "NaiveTree",
   "regression" = "Regression",
   "fanova" = "fANOVA",
