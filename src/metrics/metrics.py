@@ -16,6 +16,7 @@ This measure can be thought of as "between-bucket" variation.
 # imports
 import pandas as pd
 import numpy as np
+import warnings
 from copy import deepcopy
 from collections import defaultdict
 from itertools import combinations
@@ -380,9 +381,12 @@ def decide(
             full_combo_space = list(imputed_means.keys())
 
             phi_values = []
+            num_contexts = 0
+            num_imputed = 0
             for _context, context_rows in multiverse_results.groupby(
                 [multiverse_results[col] for col in other_dim_cols]
             ):
+                num_contexts += 1
                 real_by_combo = dict(
                     zip(
                         context_rows[target_dim_cols].itertuples(
@@ -391,13 +395,31 @@ def decide(
                         context_rows[perf_col],
                     )
                 )
-                comparable_set = [
-                    real_by_combo[combo]
-                    if combo in real_by_combo
-                    else imputed_means[combo]
-                    for combo in full_combo_space
-                ]
+                comparable_set = []
+                for combo in full_combo_space:
+                    if combo in real_by_combo:
+                        comparable_set.append(real_by_combo[combo])
+                    else:
+                        comparable_set.append(imputed_means[combo])
+                        num_imputed += 1
                 phi_values.append(spread(np.asarray(comparable_set)))
+
+            if num_imputed > 0:
+                # the multiverse is ragged for this specific subset: at least
+                # one background context was missing a real outcome for one
+                # of target_dims' choices, so total_effect partly relies on
+                # imputed average-case counterfactuals rather than purely
+                # observed adjacent universes (see UNBALANCED_TREES.md). This
+                # also means total_effect ~= main_effect + interaction_effect
+                # only holds approximately for this subset.
+                warnings.warn(
+                    f"total_effect for {target_dims} used {num_imputed} "
+                    f"imputed average-case counterfactual value(s) out of "
+                    f"{num_contexts} background contexts (multiverse is "
+                    f"ragged for this subset). total_effect ~= main_effect + "
+                    f"interaction_effect will only hold approximately here.",
+                    stacklevel=2,
+                )
 
             # aggregate the per-context spreads with Lambda (equal weight per
             # background context by default)
