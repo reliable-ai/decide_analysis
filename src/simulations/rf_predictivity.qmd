@@ -1,0 +1,146 @@
+---
+title: Tests How RFs perform on the Two Implemented Multiverses
+---
+
+R port of `rf_predictivity.ipynb`, using `ranger()` in place of scikit-learn's
+`RandomForestRegressor`. See the note at the bottom on which numbers are
+expected to agree with the notebook.
+
+```{r}
+#| label: setup
+#| message: false
+library(tidyverse)
+library(ranger)
+```
+
+```{r}
+#| label: helpers
+# sklearn's mean_squared_error() and r2_score()
+mse <- function (actual, pred) mean((actual - pred)^2)
+r2 <- function (actual, pred) {
+  1 - sum((actual - pred)^2) / sum((actual - mean(actual))^2)
+}
+
+# pd.get_dummies(): one column per level, with no reference level dropped
+one_hot <- function (df) {
+  df <- df |> mutate(across(everything(), as.factor))
+  model.matrix(
+    ~ . - 1,
+    data = df,
+    contrasts.arg = lapply(df, contrasts, contrasts = FALSE)
+  )
+}
+
+# RandomForestRegressor(n_estimators = 100, random_state = 42,
+# bootstrap = False): sklearn considers every feature at each split for
+# regressors (max_features = 1.0) and grows trees out fully, neither of which is
+# ranger's default. sample.fraction = 1 keeps the full training set in every
+# tree, and replace = FALSE is bootstrap = False.
+fit_rf <- function (x, y, seed = 42) {
+  ranger(
+    x = x, y = y,
+    num.trees = 100,
+    mtry = ncol(x),
+    min.node.size = 1,
+    replace = FALSE,
+    sample.fraction = 1,
+    seed = seed
+  )
+}
+
+predict_rf <- function (model, x) predict(model, data = x)$predictions
+
+# train_test_split(test_size = 0.4, random_state = 42) draws its partition from
+# numpy's RNG, which R cannot reproduce, so we take our own draw of the same size
+split_test <- function (n, test_size = 0.4, seed = 42) {
+  set.seed(seed)
+  sample(n, size = ceiling(test_size * n))
+}
+```
+
+```{r}
+#| label: read-data
+# read in the fertility and hurricane results
+fertility <- read.csv("../../case_studies/fertility/output/runs/1/data/agg_1_run_outputs.csv.gz")
+hurricane <- read.csv("../../case_studies/hurricane/output/runs/1/data/agg_1_run_outputs.csv.gz")
+```
+
+```{r}
+#| label: fertility-features
+# make the X columns the ones that start with mv_dim
+fertility_X_cols <- fertility |> select(starts_with("mv_dim")) |> colnames()
+fertility_y_col <- "fertility_low_estimate"
+fertility_y <- fertility[[fertility_y_col]]
+# one-hot encode the columns of fertility_X, since they are all categorical
+fertility_X <- one_hot(fertility[fertility_X_cols])
+```
+
+```{r}
+#| label: fertility-train-error
+# fit random forest regression model, look at training error
+fertility_rf <- fit_rf(fertility_X, fertility_y)
+fertility_y_pred <- predict_rf(fertility_rf, fertility_X)
+cat("R^2:", r2(fertility_y, fertility_y_pred), "\n")
+cat("MSE:", mse(fertility_y, fertility_y_pred), "\n")
+```
+
+```{r}
+#| label: hurricane-features
+hurricane_X_cols <- hurricane |> select(starts_with("mv_dim")) |> colnames()
+hurricane_y_col <- "mean_deaths"
+hurricane_y <- hurricane[[hurricane_y_col]]
+# one-hot encode the columns of hurricane_X, since they are all categorical
+hurricane_X <- one_hot(hurricane[hurricane_X_cols])
+```
+
+```{r}
+#| label: hurricane-train-error
+hurricane_rf <- fit_rf(hurricane_X, hurricane_y)
+hurricane_y_pred <- predict_rf(hurricane_rf, hurricane_X)
+cat("R^2:", r2(hurricane_y, hurricane_y_pred), "\n")
+cat("MSE:", mse(hurricane_y, hurricane_y_pred), "\n")
+```
+
+```{r}
+#| label: test-error
+# now see how they perform on new data using train/test split
+fertility_test <- split_test(nrow(fertility_X))
+fertility_rf_split <- fit_rf(
+  fertility_X[-fertility_test, ], fertility_y[-fertility_test]
+)
+fertility_y_test <- fertility_y[fertility_test]
+fertility_y_test_pred <- predict_rf(fertility_rf_split, fertility_X[fertility_test, ])
+cat("R^2:", r2(fertility_y_test, fertility_y_test_pred), "\n")
+cat("MSE:", mse(fertility_y_test, fertility_y_test_pred), "\n")
+
+hurricane_test <- split_test(nrow(hurricane_X))
+hurricane_rf_split <- fit_rf(
+  hurricane_X[-hurricane_test, ], hurricane_y[-hurricane_test]
+)
+hurricane_y_test <- hurricane_y[hurricane_test]
+hurricane_y_test_pred <- predict_rf(hurricane_rf_split, hurricane_X[hurricane_test, ])
+cat("R^2:", r2(hurricane_y_test, hurricane_y_test_pred), "\n")
+cat("MSE:", mse(hurricane_y_test, hurricane_y_test_pred), "\n")
+```
+
+## Agreement with `rf_predictivity.ipynb`
+
+The inputs are identical to the notebook's: the same rows (210 fertility, 2016
+hurricane), the same outcome columns, and one-hot encodings of the same width
+(16 and 24 columns).
+
+The training-error results reproduce the notebook's finding exactly — with
+`bootstrap = False` on a full multiverse every universe is its own leaf, so
+$R^2 = 1$ and the MSE is numerically zero in both (the size of that residual,
+$10^{-30}$ here versus $10^{-14}$ in the notebook for hurricane, is
+floating-point noise).
+
+The held-out results are close but not digit-for-digit, for two separate
+reasons. numpy's `train_test_split` partition cannot be reproduced from R's RNG,
+so this document draws its own 60/40 split of the same size: that alone gives
+$R^2 = 0.879$ for fertility (notebook: 0.889) and $0.966$ for hurricane
+(notebook: 0.923). Refitting on the notebook's exact partition isolates the
+remaining implementation gap between ranger and scikit-learn, and closes most of
+it — $0.889$ for fertility against the notebook's $0.889$, and $0.944$ for
+hurricane against $0.923$. Either way the conclusion is the notebook's: the
+forests generalise well to universes they have not seen.

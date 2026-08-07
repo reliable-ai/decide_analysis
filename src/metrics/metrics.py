@@ -1,21 +1,32 @@
 """
-This file defines inter-bucket (between universe) and intra-bucket (within
-universe) metrics for assessing the downstream impact of judgment calls in
-the multiverse. These metrics can be used to determine which judgment calls have
-the largest impact on downstream results and to what extent the results are
-robust to different judgment calls.
+This file defines the metrics for assessing the downstream impact of judgment
+calls in the multiverse. The supported decision importance measures are:
+
+- Naive tree-based importance. This measure, which can be thought of as "within-
+bucket" variation, measures the decrease in downstream spread caused by each
+judgment call. When used with mean and variance as the summary statistics, this
+metric is equivalent to mean decrease in impurity.
+- DECIDE. This measure leverages multiverse structure by comparing universes
+which differ only in particular decisions. By measuring the dispersion of each
+comparable set (i.e., the universes which only differ in a particular decision),
+we can attribute the variation in the downstream results to that decision.
+This measure can be thought of as "between-bucket" variation.
 """
 
 # imports
 import pandas as pd
 import numpy as np
+import warnings
 from copy import deepcopy
 from collections import defaultdict
 from itertools import combinations
 
-def organize_multiverse_results(multiverse_results: pd.DataFrame,
-                                dimension_order: list,
-                                performance_metrics: list) -> pd.DataFrame:
+
+def organize_multiverse_results(
+    multiverse_results: pd.DataFrame,
+    dimension_order: list,
+    performance_metrics: list
+) -> pd.DataFrame:
     """
     The multiverse results come as a DataFrame with columns for each judgment
     call and performance metric of interest. Here, we properly order the
@@ -24,34 +35,42 @@ def organize_multiverse_results(multiverse_results: pd.DataFrame,
     Args:
         multiverse_results (pd.DataFrame): A DataFrame containing the results of
             the multiverse analysis.
-        dimension_order (list): A list specifying the order of dimensions (judgment calls).
+        dimension_order (list): A list specifying the order of dimensions
+            (judgment calls).
         performance_metrics (list): A list of performance metrics to consider.
     """
-    
+
     # create copy of the multiverse results to avoid modifying the original
     multiverse_results = deepcopy(multiverse_results)
-    
+
     # get the subset of the results that apply for our analysis
     multiverse_results = multiverse_results[dimension_order + performance_metrics]
-    
+
     # give each column a certain level using multilevel indexing to denote
     # if it is a dimension (judgment call) or a performance metric
     multiverse_results.columns = pd.MultiIndex.from_tuples(
-        [(col, "dimension") if col in dimension_order else (col, "performance_metric")
-         for col in multiverse_results.columns]
+        [
+            (col, "dimension")
+            if col in dimension_order
+            else (col, "performance_metric")
+            for col in multiverse_results.columns
+        ]
     )
 
     return multiverse_results
 
-def path_within_bucket_variation(multiverse_results: pd.DataFrame,
-                                decision_path: dict,
-                                performance_metric: str) -> pd.DataFrame:
+
+def spread_in_path(
+    multiverse_results: pd.DataFrame,
+    decision_path: dict,
+    performance_metric: str
+) -> pd.DataFrame:
     """
     Calculates the within-bucket variation for a particular decision path.
     This measures how much variance in the performance metric exists after
     making a specific series of judgment calls (i.e., following the specified
     decision path).
-    
+
     Args:
         multiverse_results (pd.DataFrame): A DataFrame containing the results of
             the multiverse analysis.
@@ -62,27 +81,31 @@ def path_within_bucket_variation(multiverse_results: pd.DataFrame,
         float: The variance of the performance metric across the remaining
             universes after filtering for the specified decision path.
     """
-    
+
     # create copy of the multiverse results to avoid modifying the original
     multiverse_results = deepcopy(multiverse_results)
-    
+
     # filter the multiverse to only include rows that match the decision path
     for dimension, choice in decision_path.items():
-        multiverse_results = \
-            multiverse_results[multiverse_results[(dimension,
-                                                   "dimension")] == choice]
-            
+        multiverse_results = multiverse_results[
+            multiverse_results[(dimension, "dimension")] == choice
+        ]
+
     # calculate the variance of the performance metric across the remaining
     # universes (i.e., different combinations of the remaining judgment calls)
-    variance = multiverse_results[(performance_metric, "performance_metric")].var(ddof=0)  # use population variance for within-bucket variation
-    
+    variance = multiverse_results[(performance_metric, "performance_metric")].var(
+        ddof=0
+    )  # use population variance for within-bucket variation
+
     return variance
 
-def within_bucket_variation(multiverse_results: pd.MultiIndex,
-                           performance_metric: str) -> dict:
+
+def naive_tree_based_importance(
+    multiverse_results: pd.MultiIndex, performance_metric: str
+) -> dict:
     """
     Calculate the within-bucket variation for a given performance metric. This
-    measures how much the performance metric varies within each bucket (i.e., 
+    measures how much the performance metric varies within each bucket (i.e.,
     within each combination of judgment calls).
 
     Args:
@@ -94,27 +117,31 @@ def within_bucket_variation(multiverse_results: pd.MultiIndex,
             judgment call for the specified performance metric. Keys are the
             dimension names, values are the variation.
     """
-        
+
     # because the judgment calls are organized chronologically, we can calculate
     # the within-bucket variation by going column-by-column
     # and calculating the variance of the performance metric across the
     # different forks of the multiverse.
-    
+
     # create copy of the multiverse results to avoid modifying the original
     multiverse_results = deepcopy(multiverse_results)
-    
+
     # STEP 1
     # enumerate the nodes in the decision tree, where each node corresponds to
     # the series of judgment calls that lead to that node.
-    decision_paths = [(0, {})] # list of tuples of the form (depth, path) where depth is an int and path is a dict of the form {dimension: choice}
+    decision_paths = [
+        (0, {})
+    ]  # list of tuples of the form (depth, path) where depth is an int and path is a dict of the form {dimension: choice}
     # loop through number of judgment calls, which is number of columns that are dimensions in the multiindex
-    for depth in range(1, multiverse_results.columns.get_level_values(1).tolist().count("dimension")):
+    for depth in range(
+        1, multiverse_results.columns.get_level_values(1).tolist().count("dimension")
+    ):
         # get the unique combinations of judgment calls up to this depth
         unique_paths = multiverse_results.iloc[:, :depth].drop_duplicates()
         for _, row in unique_paths.iterrows():
             path = {col[0]: row[col] for col in unique_paths.columns}
             decision_paths.append((depth, path))
-    
+
     # STEP 2
     # now that we have the decision paths enumerated, we want to organize them
     # into dictionaries keyed by the depth in the decision tree (i.e., the number of judgment calls made),
@@ -122,16 +149,16 @@ def within_bucket_variation(multiverse_results: pd.MultiIndex,
     decision_paths_by_depth = defaultdict(list)
     for depth, path in decision_paths:
         decision_paths_by_depth[depth].append(path)
-    
+
     # print("`decision_paths_by_depth`:")
     # print(decision_paths_by_depth)
-        
+
     # STEP 3
     # notice that we can get the variance of circle A by taking variance of all
     # paths that meet depth 0. variance of each B circle by taking variance
     # of each path at depth 1. etc.
     # so to get average variance due to the decision in the multiverse,
-    # take mean(path_within_bucket_variation(path)) for each path at the depth correspnding to that decision.
+    # take mean(spread_in_path(path)) for each path at the depth correspnding to that decision.
     var_by_depth = {}
     for depth, paths in decision_paths_by_depth.items():
         paths_with_var = {}
@@ -149,15 +176,14 @@ def within_bucket_variation(multiverse_results: pd.MultiIndex,
                     if dimension in path:
                         path_tuple.append(path[dimension])
             path_tuple = tuple(path_tuple)
-            paths_with_var[path_tuple] = \
-                path_within_bucket_variation(multiverse_results,
-                                            path,
-                                            performance_metric)
+            paths_with_var[path_tuple] = spread_in_path(
+                multiverse_results, path, performance_metric
+            )
         var_by_depth[depth] = paths_with_var
 
     # print("`var_by_depth`:")
     # print(var_by_depth)
-    
+
     # STEP 4
     # now we have the variance for each path at each depth. we want to use this
     # to calculate the decrease in variance at each split. specifically, we take
@@ -174,15 +200,16 @@ def within_bucket_variation(multiverse_results: pd.MultiIndex,
             # get the paths that are one decision away from this path (i.e.,
             # the paths that are the same as this path except for one additional
             # judgment call)
-            paths_one_decision_away = [p for p in \
-                var_by_depth.get(depth + 1, {}).keys() if \
-                    p[:depth] == path_tuple]
+            paths_one_decision_away = [
+                p
+                for p in var_by_depth.get(depth + 1, {}).keys()
+                if p[:depth] == path_tuple
+            ]
             # print(f"At depth {depth}, for path {path_tuple} with variance \
-                # {var}, the paths one decision away are: \
-                    # {paths_one_decision_away}")
+            # {var}, the paths one decision away are: \
+            # {paths_one_decision_away}")
             for path_one_decision_away in paths_one_decision_away:
-                var_one_decision_away = \
-                    var_by_depth[depth + 1][path_one_decision_away]
+                var_one_decision_away = var_by_depth[depth + 1][path_one_decision_away]
                 decrease_in_variance = var - var_one_decision_away
                 decreases_in_variance.append(decrease_in_variance)
             # if we are at the last split (children are leaf nodes),
@@ -191,485 +218,95 @@ def within_bucket_variation(multiverse_results: pd.MultiIndex,
             # the current path.
             if len(paths_one_decision_away) == 0:
                 # print(f"At depth {depth}, for path {path_tuple} with \
-                    # variance {var}, there are no paths one decision away, so \
-                        # the decrease in variance is just the variance of the \
-                            # current path.")
+                # variance {var}, there are no paths one decision away, so \
+                # the decrease in variance is just the variance of the \
+                # current path.")
                 decreases_in_variance.append(var)
-        # could take a variety of functions to summarize the decreases in 
+        # could take a variety of functions to summarize the decreases in
         # variance at this depth, such as range, variance, etc.
         # range_of_decreases_in_variance_by_depth[depth] = \
         #     np.max(decreases_in_variance) - np.min(decreases_in_variance)
-        mean_decrease_in_variance_by_depth[dimension_name] = np.mean(decreases_in_variance)
-    
+        mean_decrease_in_variance_by_depth[dimension_name] = np.mean(
+            decreases_in_variance
+        )
+
     return mean_decrease_in_variance_by_depth
 
 
-def between_bucket_variation(multiverse_results: pd.MultiIndex,
-                             performance_metric: str) -> dict:
-    """
-    Calculate the between-bucket variation for a given performance metric. This
-    measures how much the performance metric varies across different buckets
-    (i.e., different combinations of judgment calls).
-    
-    For each decision point s_i, we fix all other decisions (both upstream and
-    downstream) and vary only s_i across its possible choices. The variation in
-    the performance metric across those choices is attributable to s_i. We
-    repeat this for every possible combination of the other decisions, giving
-    a distribution of variations attributable to s_i.
-
-    Args:
-        multiverse_results (pd.DataFrame): A DataFrame containing the results
-            of the multiverse analysis.
-        performance_metric (str): The name of the performance metric to analyze.
-    Returns:
-        dict: A dictionary mapping each judgment call (dimension name) to a
-            list of variation values (one per unique combination of all other
-            decisions). Each value is the variance of the performance metric
-            when only that judgment call is varied.
-    """
-    
-    # create copy of the multiverse results to avoid modifying the original
-    multiverse_results = deepcopy(multiverse_results)
-    
-    # get the list of dimension columns (judgment calls) in order
-    dimension_cols = [col for col in multiverse_results.columns
-                      if col[1] == "dimension"]
-    dimension_names = [col[0] for col in dimension_cols]
-    
-    # IDEA
-    # for each decision node s_i in the multiverse tree, we want to get the
-    # decision paths that differ only in the choice made at s_i. if we order the
-    # nodes as (s_1, ..., s_{i-1}, s_i, s_{i+1}, ..., s_d), where we have d
-    # decisions, for each decision, we want the set
-    # {(s_1, ..., s_{i-1}, j, s_{i+1}, ..., s_d): j is a possible choice at s_i}
-    # along with the accuracy of each of these paths.
-    
-    # set up storage for later
-    between_variation = {}
-    
-    # for each decision point s_i, fix all other decisions and vary only s_i
-    for depth, target_dim in enumerate(dimension_names):
-        
-        # get s_j where i!=j (i.e., all dimensions except the target dimension)
-        other_dims = [d for d in dimension_names if d != target_dim]
-        
-        # get all unique combinations of the OTHER dimensions
-        other_dim_cols = [(d, "dimension") for d in other_dims]
-        unique_other_combos = multiverse_results[other_dim_cols] \
-            .drop_duplicates()
-            
-        # print(f"For target dimension {target_dim} at depth {depth}, the other dimensions are {other_dims} and the unique combinations of the other dimensions are:")
-        # print(unique_other_combos)
-        
-        # for each unique combination of the other decisions, compute the
-        # variance of the performance metric across the different choices of s_i
-        variations = []
-        for row_idx, other_decisions in unique_other_combos.iterrows():
-            # print("row_idx")
-            # print(row_idx)
-            # print("other_decisions")
-            # print(other_decisions)
-            # filter to rows matching this combination of other decisions
-            mask = pd.Series(True, index=multiverse_results.index)
-            for other_dim in other_dims:
-                mask &= (multiverse_results[(other_dim, "dimension")]
-                         == other_decisions[(other_dim, "dimension")])
-            # this subset of the multiverse differs only in the choice made at
-            # s_i, so any variation in the performance metric across this
-            # subset can be attributed to s_i.
-            subset = multiverse_results.loc[mask]
-            
-            # print(f"Subset of multiverse results that differ only in the choice made at \
-            #     target dimension {target_dim} for this combination of other \
-            #         decisions:")
-            # print(subset)
-            
-            # the remaining rows differ only in s_i — compute variance of
-            # the performance metric across the different choices for s_i.
-            # how do we best leverage these sets? each individual set tells us
-            # how the decision at depth i impacts the performance metric by
-            # comparison to other leaves in the set, we can see how important
-            # the decision was for driving a good conclusion/outcome. so we can
-            # take a summary statistic of the spread of the performance metric
-            # within each group, such as taking the variance (or range) of the
-            # performance metric of the leaves in the group, and later average
-            # it across groups to get an overall measure of how much the
-            # decision at depth i drives results.
-            var = subset[(performance_metric, "performance_metric")].var()
-            variations.append(var)
-        
-        # get the average variance within group, as mentioned in the notes above
-        avg_spread = np.mean(variations)
-        between_variation[target_dim] = avg_spread
-    
-    return between_variation
-
-def buv_interactions(
+def decide(
     multiverse_results: pd.DataFrame,
     performance_metric: str,
+    max_order: int = 1,
+    spread=np.var,
+    summary=np.mean,
 ) -> dict:
     """
-    Computes BUV_int(i, k) for all pairs of dimensions (i < k).
+    Single entry point for the DECIDE decomposition of a multiverse.
 
-    For each pair, fixes all other dimensions and computes the pure interaction
-    variance V_joint - V_i - V_k, then averages over all fixed contexts.
+    For every non-empty subset S of judgment calls with |S| <= max_order, this
+    reports how much of the variation in the performance metric is attributable
+    to S. This should be functional for both full-factorial (balanced)
+    multiverses and for irregular/ragged ones (e.g., where a judgment call only
+    unlocks certain choices conditional on an upstream decision).
 
-    V_joint is the variance of the full c_i x c_k grid of outcomes. V_i is the
-    variance of the row means (marginalising over k), and V_k is the variance of
-    the column means (marginalising over i). Their difference isolates the
-    variance attributable strictly to the joint movement of i and k, removing
-    each dimension's independent main effect.
+    Dispersion and aggregation are supplied as the generalized spread function
+    Phi (`spread`) and summary function Lambda (`summary`). Each receives a 1-D
+    numpy array of outcomes and returns a float.
+    With the defaults (Phi = population variance, Lambda = mean) the quantities
+    below reduce to the usual (unnormalized) Sobol' indices.
 
-    Args:
-        multiverse_results: DataFrame with MultiIndex columns
-            (name, "dimension"|"performance_metric").
-        performance_metric: Name of the performance metric to analyze.
-
-    Returns:
-        dict mapping (dim_i, dim_k) tuples to BUV_int(i, k) float values.
-    """
-    dimension_cols = [col for col in multiverse_results.columns 
-                      if col[1] == "dimension"]
-    dimension_names = [col[0] for col in dimension_cols]
-    
-    perf_col = (performance_metric, "performance_metric")
-    buv_int = {}
-
-    for dim_i, dim_k in combinations(dimension_names, 2):
-        other_dims = [d for d in dimension_names if d != dim_i and d != dim_k]
-        other_dim_cols = [(d, "dimension") for d in other_dims]
-
-        if other_dim_cols:
-            # V_joint: Variance over the i*k grid for each context
-            # We use [[perf_col]] to avoid the tuple-subsetting error, then extract the Series
-            v_joint = multiverse_results.groupby(other_dim_cols)[[perf_col]].var(ddof=0)[perf_col]
-            
-            # V_i: Average over k first, then take variance over i within each context
-            mean_over_k = multiverse_results.groupby(other_dim_cols + [(dim_i, "dimension")])[[perf_col]].mean()[perf_col]
-            v_i = mean_over_k.groupby(level=list(range(len(other_dim_cols)))).var(ddof=0)
-            
-            # V_k: Average over i first, then take variance over k within each context
-            mean_over_i = multiverse_results.groupby(other_dim_cols + [(dim_k, "dimension")])[[perf_col]].mean()[perf_col]
-            v_k = mean_over_i.groupby(level=list(range(len(other_dim_cols)))).var(ddof=0)
-            
-            # Average the interaction variance across all fixed contexts
-            interaction_var = (v_joint - v_i - v_k).mean()
-            
-        else:
-            # Edge case: Only two dimensions exist in the entire dataset
-            v_joint = multiverse_results[perf_col].var(ddof=0)
-            
-            # Wrap grouping keys in lists to ensure safe MultiIndex tuple handling
-            v_i = multiverse_results.groupby([(dim_i, "dimension")])[[perf_col]].mean()[perf_col].var(ddof=0)
-            v_k = multiverse_results.groupby([(dim_k, "dimension")])[[perf_col]].mean()[perf_col].var(ddof=0)
-            
-            interaction_var = v_joint - v_i - v_k
-
-        buv_int[(dim_i, dim_k)] = float(interaction_var)
-
-    return buv_int
-
-
-def total_variance_decomposition(multiverse_results: pd.MultiIndex,
-                                 performance_metric: str) -> dict:
-    """
-    Applies the law of total variance, which tells us that for random variables
-    $X$ and $Y$, $Var(Y) = E[Var(Y | X)] + Var(E[Y | X])$.
-    
-    The given `multiverse_results` object contains the final results for each
-    universe, such that each universe is one row, with the columns representing
-    the judgment calls made and the performance of that universe according to
-    various user-selected metrics (e.g. accuracy, MSE, etc.).
-    
-    Consider one judgment call which we would like to examine to determine how
-    much variation in the final result stems from this decision. In this case,
-    the "groups" that we are conditioning on are determined by the other
-    decisions made, such that each group consists of the universes where the
-    set of decisions made for the other decisions are identical. If we have $d$
-    decisions, each one having $c_1, ..., c_d$ options, and we are interested in
-    the $i$th decision, that means that there are $c_1 * ... * c_{i-1} * c_{i+1}
-    * c_d$ groups of size $c_i$.
-    
-    For each decision $i$ in {1, ..., $d$}, we want to calculate the following
-    three quantities:
-    1. $Var(Y)$: the variance of the performance metric across all universes in
-        the multiverse.
-    2. $E[Var(Y | X)]$: the expected variance of the performance metric
-        within each group.
-    3. $Var(E[Y | X])$: the variance of the expected performance metric
-        across groups.
-        
-    Inputs:
-        multiverse_results (pd.DataFrame): A DataFrame containing the results
-            of the multiverse analysis, with a MultiIndex for columns where
-            the first level indicates the name of the column and the second
-            level indicates whether it is a "dimension" (judgment call) or a
-            "performance_metric".
-        performance_metric (str): The name of the performance metric to analyze.
-        
-    Returns:
-        dict: A dictionary mapping each judgment call (dimension name) to a
-            dictionary containing the three quantities described above.
-    """
-    
-    # get the list of dimension columns (judgment calls) in order
-    dimension_cols = [col for col in multiverse_results.columns
-                      if col[1] == "dimension"]
-    dimension_names = [col[0] for col in dimension_cols]
-
-    # get the number of unique values for each dimension (judgment call)
-    num_unique_values_by_dimension = {
-        dimension: multiverse_results[(dimension, "dimension")].nunique()
-        for dimension in dimension_names
-    }
-
-    perf_col = (performance_metric, "performance_metric")
-
-    # var_total is identical for every target dimension, so compute it once
-    var_total = np.var(multiverse_results[perf_col])
-
-    variance_decomposition = {}
-
-    # for each decision point s_i, we want to calculate the three quantities.
-    # thus, we must condition on the groups determined by the other decisions,
-    # which means we want to group by the other dimensions and calculate the
-    # variance within each group and the mean within each group.
-    for target_dim in dimension_names:
-
-        # get s_j where i!=j (i.e., all dimensions except the target dimension)
-        other_dims = [d for d in dimension_names if d != target_dim]
-        other_dim_cols = [(d, "dimension") for d in other_dims]
-
-        # assert that the number of unique combinations of the other dimensions
-        # is equal to the product of the number of unique values
-        # for each of the other dimensions.
-        expected_num_groups = np.prod([num_unique_values_by_dimension[d] for d in other_dims])
-        unique_other_combos = multiverse_results[other_dim_cols].drop_duplicates()
-        assert unique_other_combos.shape[0] == expected_num_groups, \
-            f"Expected {expected_num_groups} unique groups, but found {unique_other_combos.shape[0]} groups."
-
-        expected_num_observations = num_unique_values_by_dimension[target_dim]
-
-        if other_dim_cols:
-            # replace the row-by-row mask loop with a vectorized groupby;
-            # select the perf column as a Series first to avoid pandas tuple-key ambiguity
-            grouped = multiverse_results[perf_col].groupby(
-                [multiverse_results[col] for col in other_dim_cols]
-            )
-
-            group_sizes = grouped.size()
-            assert (group_sizes == expected_num_observations).all(), \
-                f"Expected {expected_num_observations} observations in each group, but found otherwise."
-
-            group_vars  = grouped.var(ddof=0)  # use population variance for within-group variance
-            group_means = grouped.mean()
-        else:
-            # only one dimension: the single group is the full dataset
-            assert len(multiverse_results) == expected_num_observations, \
-                f"Expected {expected_num_observations} observations in subset, but found {len(multiverse_results)} observations."
-            group_vars  = pd.Series([multiverse_results[perf_col].var(ddof=0)])  # use population variance for within-group variance
-            group_means = pd.Series([multiverse_results[perf_col].mean()])
-
-        # main effect Var(E[Y|X_target]): group by target_dim itself (rather
-        # than the other dims) and take the variance of those group means.
-        # Note this is NOT the same as var_of_expected_values_across_groups
-        # above, which groups by the other dims and therefore equals the main
-        # effect of the *complement* of target_dim, not of target_dim itself.
-        target_group_means = multiverse_results[perf_col].groupby(
-            multiverse_results[(target_dim, "dimension")]
-        ).mean()
-        main_effect = np.var(target_group_means, ddof=0)
-
-        variance_decomposition[target_dim] = {
-            "var_total": var_total,
-            # E[Var(Y|X)]: mean of within-group variances = total effect of target_dim
-            "expected_var_within_groups": np.mean(group_vars),
-            # Var(E[Y|X]): population variance (ddof=0) of group means, matching np.var default
-            "var_of_expected_values_across_groups": np.var(group_means),
-            # Var(E[Y|X_target]): true main effect of target_dim
-            "main_effect": main_effect,
-        }
-
-    return variance_decomposition
-
-def total_variance_decomposition_with_interactions(
-    multiverse_results: pd.MultiIndex,
-    performance_metric: str
-) -> dict:
-    """
-    Applies the law of total variance, which tells us that for random variables
-    $X$ and $Y$, $Var(Y) = E[Var(Y | X)] + Var(E[Y | X])$.
-
-    The given `multiverse_results` object contains the final results for each
-    universe, such that each universe is one row, with the columns representing
-    the judgment calls made and the performance of that universe according to
-    various user-selected metrics (e.g. accuracy, MSE, etc.).
-
-    Consider one judgment call which we would like to examine to determine how
-    much variation in the final result stems from this decision. In this case,
-    the "groups" that we are conditioning on are determined by the other
-    decisions made, such that each group consists of the universes where the
-    set of decisions made for the other decisions are identical. If we have $d$
-    decisions, each one having $c_1, ..., c_d$ options, and we are interested in
-    the $i$th decision, that means that there are $c_1 * ... * c_{i-1} * c_{i+1}
-    * c_d$ groups of size $c_i$.
-
-    For each decision $i$ in {1, ..., $d$}, we want to calculate the following
-    three quantities:
-    1. $Var(Y)$: the variance of the performance metric across all universes in
-        the multiverse.
-    2. $E[Var(Y | X)]$: the expected variance of the performance metric
-        within each group.
-    3. $Var(E[Y | X])$: the variance of the expected performance metric
-        across groups.
-
-    Furthermore, instead of just treating X as one single decision, we can also
-    consider the interaction effects between decisions by potentially
-    treating X as multiple decisions. For example, if we have three decisions
-    X_1, X_2, and X_3, we could consider the interaction effects between X_1 and
-    X_2 by getting $Var(Y) = E[Var(Y | X_1, X_2)] + Var(E[Y | X_1, X_2])$. This
-    function will also calculate the variance decomposition for all combinations
-    of interactions between the decisions, so in this example it would calculate
-    the variance decomposition for X_1, X_2, X_3, the interaction between X_1
-    and X_2, the interaction between X_1 and X_3, the interaction between X_2
-    and X_3, and the interaction between X_1, X_2, and X_3.
-
-    Inputs:
-        multiverse_results (pd.DataFrame): A DataFrame containing the results
-            of the multiverse analysis, with a MultiIndex for columns where
-            the first level indicates the name of the column and the second
-            level indicates whether it is a "dimension" (judgment call) or a
-            "performance_metric".
-        performance_metric (str): The name of the performance metric to analyze.
-
-    Returns:
-        dict: A dictionary mapping each judgment call (dimension name) to a
-            dictionary containing the three quantities described above.
-    """
-
-    # get the list of dimension columns (judgment calls) in order
-    dimension_cols = [col for col in multiverse_results.columns
-                      if col[1] == "dimension"]
-    dimension_names = [col[0] for col in dimension_cols]
-
-    # get the number of unique values for each dimension (judgment call)
-    num_unique_values_by_dimension = {
-        dimension: multiverse_results[(dimension, "dimension")].nunique()
-        for dimension in dimension_names
-    }
-
-    perf_col = (performance_metric, "performance_metric")
-
-    # var_total is identical for every subset, so compute it once
-    var_total = np.var(multiverse_results[perf_col])
-
-    variance_decomposition = {}
-
-    # iterate over all non-empty subsets of dimensions (size 1 = main effects,
-    # size > 1 = interaction terms). for each subset, X is the joint variable
-    # formed by those dimensions, and we condition on the remaining dimensions.
-    for size in range(1, len(dimension_names) + 1):
-        for target_dims in combinations(dimension_names, size):
-            target_dims_set = set(target_dims)
-
-            # the "other" dimensions are those not in the current subset
-            other_dims = [d for d in dimension_names if d not in target_dims_set]
-            other_dim_cols = [(d, "dimension") for d in other_dims]
-
-            # each group contains all combinations of the target dims' values,
-            # so the expected group size is the product of their unique counts
-            expected_num_observations = np.prod([num_unique_values_by_dimension[d] for d in target_dims])
-
-            if other_dim_cols:
-                # assert that the number of unique combinations of the other dimensions
-                # is equal to the product of the number of unique values
-                # for each of the other dimensions.
-                # (skipped when other_dim_cols is empty: df[[]] behaves unexpectedly
-                # with MultiIndex columns, and the single-group case is trivially correct)
-                expected_num_groups = np.prod([num_unique_values_by_dimension[d] for d in other_dims])
-                unique_other_combos = multiverse_results[other_dim_cols].drop_duplicates()
-                assert unique_other_combos.shape[0] == expected_num_groups, \
-                    f"Expected {expected_num_groups} unique groups, but found {unique_other_combos.shape[0]} groups."
-
-                # group by the other dimensions; select perf column as a Series
-                # first to avoid pandas tuple-key ambiguity on MultiIndex columns
-                grouped = multiverse_results[perf_col].groupby(
-                    [multiverse_results[col] for col in other_dim_cols]
-                )
-
-                group_sizes = grouped.size()
-                assert (group_sizes == expected_num_observations).all(), \
-                    f"Expected {expected_num_observations} observations in each group, but found otherwise."
-
-                group_vars  = grouped.var(ddof=0)  # use population variance for within-group variance
-                group_means = grouped.mean()
-            else:
-                # all dimensions are in the target subset: one group = full dataset
-                assert len(multiverse_results) == expected_num_observations, \
-                    f"Expected {expected_num_observations} observations, but found {len(multiverse_results)}."
-                group_vars  = pd.Series([multiverse_results[perf_col].var(ddof=0)])  # use population variance for within-group variance
-                group_means = pd.Series([multiverse_results[perf_col].mean()])
-
-            # main effect Var(E[Y|X_target]): group by the target dims
-            # themselves (rather than the other dims) and take the variance
-            # of those group means. Note this is NOT the same as
-            # var_of_expected_values_across_groups above, which groups by the
-            # other dims and therefore equals the main effect of the
-            # *complement* of target_dims, not of target_dims itself.
-            target_dim_cols = [(d, "dimension") for d in target_dims]
-            target_group_means = multiverse_results[perf_col].groupby(
-                [multiverse_results[col] for col in target_dim_cols]
-            ).mean()
-            main_effect = np.var(target_group_means, ddof=0)
-
-            # use a tuple key for all entries so single and multi-dim keys are
-            # the same type and interaction keys are unambiguous
-            variance_decomposition[target_dims] = {
-                "var_total": var_total,
-                # E[Var(Y|X)]: mean of within-group variances = total effect of target_dims
-                "expected_var_within_groups": np.mean(group_vars),
-                # Var(E[Y|X]): population variance (ddof=0) of group means
-                "var_of_expected_values_across_groups": np.var(group_means),
-                # Var(E[Y|X_target]): true main effect of target_dims
-                "main_effect": main_effect,
-            }
-
-    return variance_decomposition
-
-def generalized_main_effect(
-    multiverse_results: pd.DataFrame,
-    performance_metric: str,
-    max_order: int = None,
-) -> dict:
-    """
-    Computes GME(S) = Var(E[Y|X_S]) for every non-empty subset S of judgment
-    calls, directly from the universes that were actually evaluated.
-
-    Unlike total_variance_decomposition_with_interactions, this makes no
-    assumption that the multiverse is a full-factorial (balanced) design.
-    Some judgment calls may only unlock certain choices conditional on an
-    upstream decision (e.g. s1=2 unlocking an extra choice for s2 that
-    s1=1 does not have), so groups formed by conditioning on S can legitimately
-    differ in size across the values of S. GME(S) only requires grouping the
-    real universes by their realized values of S and taking the variance of
-    the resulting group means, so it is well-defined regardless of whether
-    those groups are the same size.
+    Three quantities are reported per subset S:
+      - main_effect        GME(S) = Phi_{s_S}(Lambda_{p_{-S}}(f)): the
+                           "closed" first-to-|S|-order effect of S -- how much
+                           the summarised outcome moves as S's choices vary,
+                           aggregating over everything else. (Var(E[Y|X_S]) by
+                           default.)
+      - total_effect       DECIDE(S) = Lambda_{p_{-S}}(Phi(comparable set)):
+                           the total effect of S -- the spread across S's choices
+                           within each fixed background context, aggregated over
+                           contexts (with an average-case counterfactual imputed
+                           for choices of S that a context never realised).
+                           (E[Var(Y|X_{-S})] by default.)
+      - interaction_effect the pure marginal (Sobol / functional-ANOVA)
+                           interaction of exactly S, obtained by stripping the
+                           lower-order effects out of main_effect:
+                           interaction_effect(S) = main_effect(S)
+                                                   - sum_{T proper subset of S}
+                                                        interaction_effect(T).
+                           For |S| == 1 this is identical to main_effect, so it
+                           is omitted from the returned dict for singletons
+                           (main_effect already reports it; see below) and only
+                           included for |S| >= 2. This decomposition relies on
+                           the additivity of variance, so it is exact only for
+                           Phi = variance / Lambda = mean and is a heuristic for
+                           other spread functions. On a ragged tree the identity
+                           total = main + interaction likewise only holds
+                           approximately, since some values are imputed.
 
     Args:
         multiverse_results (pd.DataFrame): DataFrame with MultiIndex columns
             (name, "dimension"|"performance_metric"), as produced by
             organize_multiverse_results.
         performance_metric (str): Name of the performance metric to analyze.
-        max_order (int, optional): Largest subset size to compute GME for.
-            Defaults to considering every judgment call (i.e. the full power
-            set of dimensions).
+        max_order (int, optional): Largest subset size to report. Defaults to 1
+            (main + total effect for each single judgment call). Pass a larger
+            value (or None for the full power set) to also get interaction
+            effects up to that order.
+        spread (callable, optional): Spread function Phi mapping a 1-D numpy
+            array of outcomes to a dispersion value. Defaults to np.var
+            (population variance, ddof=0).
+        summary (callable, optional): Summary function Lambda mapping a 1-D numpy
+            array of outcomes to an aggregate value. Defaults to np.mean.
 
     Returns:
-        dict: mapping each non-empty tuple of judgment call names to its
-            GME (a float).
+        dict: mapping each non-empty tuple of judgment call names (up to
+            max_order) to a dict with keys "var_total", "main_effect", and
+            "total_effect", plus "interaction_effect" for subsets with
+            |S| >= 2 (omitted for singletons -- see interaction_effect above).
     """
-    dimension_cols = [col for col in multiverse_results.columns
-                      if col[1] == "dimension"]
+    dimension_cols = [
+        col for col in multiverse_results.columns if col[1] == "dimension"
+    ]
     dimension_names = [col[0] for col in dimension_cols]
 
     perf_col = (performance_metric, "performance_metric")
@@ -677,64 +314,42 @@ def generalized_main_effect(
     if max_order is None:
         max_order = len(dimension_names)
 
-    gme = {}
+    def summarize_groups(cols):
+        # lambda applied within each group formed by `cols`, returning one
+        # summary value per group (indexed by the group's key tuple).
+        return (
+            multiverse_results[perf_col]
+            .groupby([multiverse_results[col] for col in cols])
+            .apply(lambda s: summary(s.to_numpy()))
+        )
+
+    # var_total is the same scalar for every subset (total spread of outcomes).
+    var_total = float(spread(multiverse_results[perf_col].to_numpy()))
+
+    # --- main effects: Phi_{s_S}(Lambda_{p_{-S}}(f)) for every subset ---
+    main_effect = {}
     for size in range(1, max_order + 1):
         for target_dims in combinations(dimension_names, size):
             target_dim_cols = [(d, "dimension") for d in target_dims]
-            group_means = multiverse_results[perf_col].groupby(
-                [multiverse_results[col] for col in target_dim_cols]
-            ).mean()
-            gme[target_dims] = np.var(group_means, ddof=0)
+            group_summaries = summarize_groups(target_dim_cols)
+            main_effect[target_dims] = float(spread(group_summaries.to_numpy()))
 
-    return gme
+    # --- pure marginal (Sobol) interaction ---
+    # interaction_effect(S) = main_effect(S) - sum over proper subsets T of S of
+    # interaction_effect(T). Because every proper subset of an S with
+    # |S| <= max_order is itself enumerated above, this is always well-defined.
+    interaction_effect = {}
+    for size in range(1, max_order + 1):
+        for target_dims in combinations(dimension_names, size):
+            lower = sum(
+                interaction_effect[sub]
+                for r in range(1, size) # no-op if size=1, so nothing happens
+                for sub in combinations(target_dims, r)
+            )
+            interaction_effect[target_dims] = main_effect[target_dims] - lower
 
-def catchy_name_total_effect(
-    multiverse_results: pd.DataFrame,
-    performance_metric: str,
-    max_order: int = None,
-) -> dict:
-    """
-    Computes CATCHY_NAME(S), the total effect of judgment call subset S, for
-    every non-empty S, extended to multiverses where the tree is ragged (some
-    judgment calls unlock extra choices only under specific upstream
-    decisions, so a background context does not always have a real outcome
-    for every possible choice of S).
-
-    For a realized background context p_{-S} (a combination of every
-    judgment call not in S), the comparable set should contain one outcome
-    for every combination of S's choices that occurs anywhere in the
-    multiverse. When a particular combination was never actually evaluated
-    under that specific background context, it is replaced by the
-    average-case counterfactual: the plain, unconditioned mean of Y over
-    every real universe that does take that combination of S's choices,
-    regardless of anything else. This never fabricates a specific matched
-    universe; it only ever imputes with a directly-computable marginal mean,
-    so every comparable set ends up the same size and every context is
-    aggregated with equal weight.
-
-    Args:
-        multiverse_results (pd.DataFrame): DataFrame with MultiIndex columns
-            (name, "dimension"|"performance_metric"), as produced by
-            organize_multiverse_results.
-        performance_metric (str): Name of the performance metric to analyze.
-        max_order (int, optional): Largest subset size to compute
-            CATCHY_NAME for. Defaults to considering every judgment call
-            (the full power set of dimensions).
-
-    Returns:
-        dict: mapping each non-empty tuple of judgment call names to its
-            CATCHY_NAME total effect (a float).
-    """
-    dimension_cols = [col for col in multiverse_results.columns
-                      if col[1] == "dimension"]
-    dimension_names = [col[0] for col in dimension_cols]
-
-    perf_col = (performance_metric, "performance_metric")
-
-    if max_order is None:
-        max_order = len(dimension_names)
-
-    catchy_name = {}
+    # --- total effects: ragged-tree safe total effect of every subset ---
+    total_effect = {}
     for size in range(1, max_order + 1):
         for target_dims in combinations(dimension_names, size):
             target_dim_cols = [(d, "dimension") for d in target_dims]
@@ -742,27 +357,23 @@ def catchy_name_total_effect(
             other_dim_cols = [(d, "dimension") for d in other_dims]
 
             if not other_dim_cols:
-                # target_dims covers every decision: there is only one
-                # background context (the whole dataset), and every
-                # combination of target_dims is real by construction.
-                catchy_name[target_dims] = float(
-                    multiverse_results[perf_col].var(ddof=0)
+                # target_dims covers every decision: one background context (the
+                # whole dataset), every combination of target_dims is real.
+                total_effect[target_dims] = float(
+                    spread(multiverse_results[perf_col].to_numpy())
                 )
                 continue
 
-            # average-case counterfactual for every combination of
-            # target_dims' choices that occurs anywhere in the multiverse:
-            # E[Y | X_target = combo], unconditioned on anything else.
-            # This also defines the full comparable-set space -- combinations
-            # of target_dims that never occur anywhere are not considered,
-            # since there is no data to ground them in.
-            grouped_means = multiverse_results[perf_col].groupby(
-                [multiverse_results[col] for col in target_dim_cols]
-            ).mean()
-            # normalize keys to tuples explicitly: groupby collapses a
-            # single-column key to a bare scalar Index rather than a
-            # 1-element-tuple MultiIndex, which would otherwise silently
-            # mismatch against the tuple keys built from itertuples() below
+            # average-case counterfactual for every combination of target_dims'
+            # choices that occurs anywhere in the multiverse: Lambda over the
+            # rest of the pipeline, unconditioned on anything else. This also
+            # defines the full comparable-set space -- combinations that never
+            # occur anywhere are not considered, since there is no data to ground
+            # them in.
+            grouped_means = summarize_groups(target_dim_cols)
+            # normalize keys to tuples: groupby collapses a single-column key to
+            # a bare scalar Index rather than a 1-element-tuple MultiIndex, which
+            # would otherwise mismatch the tuple keys built from itertuples below.
             if len(target_dim_cols) == 1:
                 imputed_means = {(k,): v for k, v in grouped_means.items()}
             else:
@@ -770,21 +381,63 @@ def catchy_name_total_effect(
             full_combo_space = list(imputed_means.keys())
 
             phi_values = []
-            for context, context_rows in multiverse_results.groupby(
+            num_contexts = 0
+            num_imputed = 0
+            for _context, context_rows in multiverse_results.groupby(
                 [multiverse_results[col] for col in other_dim_cols]
             ):
-                real_by_combo = dict(zip(
-                    context_rows[target_dim_cols].itertuples(index=False, name=None),
-                    context_rows[perf_col],
-                ))
-                comparable_set = [
-                    real_by_combo[combo] if combo in real_by_combo
-                    else imputed_means[combo]
-                    for combo in full_combo_space
-                ]
-                phi_values.append(np.var(comparable_set, ddof=0))
+                num_contexts += 1
+                real_by_combo = dict(
+                    zip(
+                        context_rows[target_dim_cols].itertuples(
+                            index=False, name=None
+                        ),
+                        context_rows[perf_col],
+                    )
+                )
+                comparable_set = []
+                for combo in full_combo_space:
+                    if combo in real_by_combo:
+                        comparable_set.append(real_by_combo[combo])
+                    else:
+                        comparable_set.append(imputed_means[combo])
+                        num_imputed += 1
+                phi_values.append(spread(np.asarray(comparable_set)))
 
-            # equal weight per background context (default aggregation)
-            catchy_name[target_dims] = float(np.mean(phi_values))
+            if num_imputed > 0:
+                # the multiverse is ragged for this specific subset: at least
+                # one background context was missing a real outcome for one
+                # of target_dims' choices, so total_effect partly relies on
+                # imputed average-case counterfactuals rather than purely
+                # observed adjacent universes (see UNBALANCED_TREES.md). This
+                # also means total_effect ~= main_effect + interaction_effect
+                # only holds approximately for this subset.
+                warnings.warn(
+                    f"total_effect for {target_dims} used {num_imputed} "
+                    f"imputed average-case counterfactual value(s) out of "
+                    f"{num_contexts} background contexts (multiverse is "
+                    f"ragged for this subset). total_effect ~= main_effect + "
+                    f"interaction_effect will only hold approximately here.",
+                    stacklevel=2,
+                )
 
-    return catchy_name
+            # aggregate the per-context spreads with Lambda (equal weight per
+            # background context by default)
+            total_effect[target_dims] = float(summary(np.asarray(phi_values)))
+
+    # --- assemble per-subset results ---
+    decomposition = {}
+    for target_dims in main_effect:
+        entry = {
+            "var_total": var_total,
+            "main_effect": main_effect[target_dims],
+            "total_effect": total_effect[target_dims],
+        }
+        # interaction_effect(S) == main_effect(S) for |S| == 1 by construction
+        # (see the recursion above), so it's only reported for |S| >= 2 to
+        # avoid encoding the same number under two names.
+        if len(target_dims) >= 2:
+            entry["interaction_effect"] = interaction_effect[target_dims]
+        decomposition[target_dims] = entry
+
+    return decomposition

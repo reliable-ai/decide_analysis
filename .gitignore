@@ -33,3 +33,6 @@ analysis/*_files/
 analysis/*.pdf
 analysis/*.html
 .positai
+
+# notes
+notes/
