@@ -63,44 +63,98 @@ safe_cor <- function (x, y, method = "spearman") {
   suppressWarnings(cor(x, y, method = method))
 }
 
+# Restrict a multiverse to the specified decision-option pairs, then discard
+# dimensions that no longer vary in the ablated data.
 fix_decision <- function (mv, fixed_decision, fixed_option, dim_prefix = "mv_dim_") {
-  mv |>
-    filter(as.character(.data[[fixed_decision]]) == fixed_option) |>
-    remove_fake_decisions(dim_prefix = dim_prefix)
+  for (i in seq_along(fixed_decision)) {
+    mv <- mv |>
+      filter(as.character(.data[[fixed_decision[[i]]]]) == fixed_option[[i]])
+  }
+  mv |> remove_fake_decisions(dim_prefix = dim_prefix)
 }
 
-build_ablation_grid <- function (mv, dim_prefix = "mv_dim_") {
+# Build the ablation grid.
+#
+# `prefixes` is an optional character vector of column-name prefixes.  All
+# dimension columns whose name starts with a given prefix are treated as a
+# single logical decision: they are ablated jointly (every unique combination
+# of their values counts as one "option") and are excluded from individual
+# single-column ablation.  Prefixes are matched before individual columns, so
+# the same column cannot appear in both.
+#
+# The returned tibble has two extra list-columns used internally by
+# calc_ablation_importance:
+#   fixed_decision_cols – character vector of actual column names to filter on.
+#   fixed_option_vals   – character vector of values (parallel to the above).
+build_ablation_grid <- function (mv, prefixes = character(0), dim_prefix = "mv_dim_") {
   dim_cols <- mv |>
     select(starts_with(dim_prefix)) |>
     colnames()
 
-  purrr::map_dfr(
-    dim_cols,
-    function (fixed_decision) {
+  # Absorb columns claimed by a prefix so they are not individually ablated.
+  grouped_cols <- character(0)
+
+  prefix_rows <- purrr::map_dfr(
+    prefixes,
+    function (pfx) {
+      matching <- dim_cols[startsWith(dim_cols, pfx)]
+      if (length(matching) == 0) return(tibble())
+      grouped_cols <<- c(grouped_cols, matching)
+
+      combos <- mv |>
+        select(all_of(matching)) |>
+        distinct() |>
+        mutate(across(everything(), as.character))
+
+      purrr::map_dfr(seq_len(nrow(combos)), function (i) {
+        vals <- unname(unlist(combos[i, ]))
+        tibble(
+          fixed_decision       = pfx,
+          fixed_decision_label = strip_dim_prefix(pfx, dim_prefix = dim_prefix),
+          fixed_option         = paste(vals, collapse = "/"),
+          fixed_decision_cols  = list(matching),
+          fixed_option_vals    = list(vals)
+        )
+      })
+    }
+  )
+
+  individual_cols <- setdiff(dim_cols, grouped_cols)
+
+  individual_rows <- purrr::map_dfr(
+    individual_cols,
+    function (col) {
+      options <- unique(as.character(mv[[col]]))
       tibble(
-        fixed_decision = fixed_decision,
-        fixed_decision_label = strip_dim_prefix(fixed_decision, dim_prefix = dim_prefix),
-        fixed_option = unique(as.character(mv[[fixed_decision]]))
+        fixed_decision       = col,
+        fixed_decision_label = strip_dim_prefix(col, dim_prefix = dim_prefix),
+        fixed_option         = options,
+        fixed_decision_cols  = rep(list(col), length(options)),
+        fixed_option_vals    = as.list(options)
       )
     }
   )
+
+  bind_rows(prefix_rows, individual_rows)
 }
 
 calc_ablation_importance <- function (
   mv,
   colname_metric,
   dim_prefix = "mv_dim_",
+  prefixes = character(0),
   post_process_importances = NULL
 ) {
-  ablation_grid <- build_ablation_grid(mv, dim_prefix = dim_prefix)
+  ablation_grid <- build_ablation_grid(mv, prefixes = prefixes, dim_prefix = dim_prefix)
 
   purrr::pmap_dfr(
     ablation_grid,
-    function (fixed_decision, fixed_decision_label, fixed_option) {
+    function (fixed_decision, fixed_decision_label, fixed_option,
+              fixed_decision_cols, fixed_option_vals) {
       ablated_mv <- fix_decision(
         mv,
-        fixed_decision = fixed_decision,
-        fixed_option = fixed_option,
+        fixed_decision = fixed_decision_cols,
+        fixed_option = fixed_option_vals,
         dim_prefix = dim_prefix
       )
 
@@ -232,10 +286,10 @@ summarise_method_stability <- summarise_inter_method_stability
 # 2) recompute importance after fixing each decision to each option,
 # 3) compare methods within each ablated setting,
 # 4) compare each method's full-multiverse importances to its ablated variants.
-run_ablation_analysis <- function (mv, colname_metric, dim_prefix = "mv_dim_") {
+run_ablation_analysis <- function (mv, colname_metric, dim_prefix = "mv_dim_", prefixes = character(0), post_process_importances = NULL) {
   # Baseline: importances computed on the full multiverse (no fixed decision).
   baseline_importance <- tidy_importance_methods(
-    calc_importance_methods(mv, colname_metric = colname_metric, dim_prefix = dim_prefix),
+    calc_importance_methods(mv, colname_metric = colname_metric, dim_prefix = dim_prefix, post_process_importances = post_process_importances),
     dim_prefix = dim_prefix
   )
 
@@ -243,7 +297,9 @@ run_ablation_analysis <- function (mv, colname_metric, dim_prefix = "mv_dim_") {
   ablation_importance <- calc_ablation_importance(
     mv,
     colname_metric = colname_metric,
-    dim_prefix = dim_prefix
+    dim_prefix = dim_prefix,
+    prefixes = prefixes,
+    post_process_importances = post_process_importances
   )
 
   # Add the full-multiverse baseline as a reference pseudo-setting so method

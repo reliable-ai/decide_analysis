@@ -1,0 +1,76 @@
+---
+title: "Ablation Study: Orben 2019 (NHB) - MCS Total"
+format: pdf
+---
+
+```{r setup}
+source("R/_load.R")
+```
+
+This document contains the ablation study for the MCS Total multiverse dataset
+from Orben & Przybylski (2019, *Nature Human Behaviour*). Every decision is
+fixed to one option in turn, importance estimates are recomputed on the reduced
+multiverse, and the resulting importance vectors are compared across methods
+and across options of the fixed decision.
+
+```{r mcs-load-data}
+mv_mcs <- load_multiverse("orben2019nhb_mcs_total") |>
+  expand_y_variable()
+```
+
+## Ablation Study
+
+```{r mcs-ablation-run}
+ablation_mcs <- run_ablation_analysis(
+  mv_mcs,
+  colname_metric = "effect",
+  post_process_importances = function(imp) {
+    imp |>
+      aggregate_onehot_importances()
+  }
+)
+```
+
+### Inter-method stability
+
+```{r mcs-ablation-inter-method-table}
+ablation_mcs$inter_method_stability_summary |>
+  mutate(
+    fixed_decision_label = if_else(
+      fixed_decision == "full_multiverse",
+      "full multiverse",
+      fixed_decision_label
+    )
+  ) |>
+  select(
+    fixed_decision_label,
+    method_x,
+    method_y,
+    mean_rank_correlation,
+    min_rank_correlation
+  )
+```
+
+```{r mcs-ablation-inter-method-plot}
+#| fig-width: 6
+#| fig-height: 4.5
+vis_inter_method_stability(ablation_mcs$inter_method_stability_summary) +
+  theme(legend.position = "none")
+```
+
+### Intra-method stability
+
+```{r mcs-ablation-intra-method-table}
+ablation_mcs$intra_method_stability_summary |>
+  select(
+    fixed_decision_label,
+    method,
+    mean_rank_correlation,
+    min_rank_correlation,
+    mean_abs_difference
+  )
+```
+
+```{r mcs-ablation-intra-method-plot}
+vis_intra_method_stability(ablation_mcs$intra_method_stability_summary)
+```
