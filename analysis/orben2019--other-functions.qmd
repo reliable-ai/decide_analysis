@@ -1,0 +1,74 @@
+---
+title: "Try out Other Summary Functions: Orben 2019 (NHB)"
+format: pdf
+---
+
+```{r setup}
+source("R/_load.R")
+```
+
+# Overview
+
+## Load Data
+
+```{r yrbs-load-data}
+mv_yrbs_org <- load_multiverse("orben2019nhb_yrbs")
+mv_yrbs_onehot <- mv_yrbs_org |>
+  expand_y_variable()
+mv_yrbs <- mv_yrbs_onehot
+mv_yrbs
+```
+
+```{r mtf-load-data}
+# mv_mtf_org <- load_multiverse("orben2019nhb_mtf")
+# mv_mtf_onehot <- mv_mtf_org |>
+#   expand_y_variable()
+# mv_mtf <- mv_mtf_onehot
+# mv_mtf
+```
+
+```{r mcs-load-data}
+# mv_mcs_org <- load_multiverse("orben2019nhb_mcs_total")
+# mv_mcs_onehot <- mv_mcs_org |>
+#   expand_y_variable()
+# mv_mcs <- mv_mcs_onehot
+# mv_mcs
+```
+
+# Analysis
+
+## YRBS
+
+```{r}
+mv_yrbs
+```
+
+DECIDE default score
+
+```{r yrbs-between-bucket}
+decide_yrbs <- calc_between_bucket_variation(mv_yrbs, colname_metric = "effect") |> 
+  aggregate_onehot_importances()
+decide_yrbs
+```
+
+```{r yrbs-between-bucket-plot}
+vis_importance(decide_yrbs)
+```
+
+Try out other functions
+
+```{r decide-range-max-yrbs}
+decide_range_max_yrbs <- calc_between_bucket_variation(
+  mv_yrbs,
+  colname_metric = "effect",
+  fun_spread = function(x) { diff(range(x)) },
+  fun_summary = max
+) |> 
+  aggregate_onehot_importances()
+decide_range_max_yrbs
+```
+
+```{r decide-range-max-yrbs-vis}
+vis_importance(decide_range_max_yrbs)
+```
+
