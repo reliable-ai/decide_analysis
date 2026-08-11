@@ -20,19 +20,19 @@ mv_yrbs
 ```
 
 ```{r mtf-load-data}
-# mv_mtf_org <- load_multiverse("orben2019nhb_mtf")
-# mv_mtf_onehot <- mv_mtf_org |>
-#   expand_y_variable()
-# mv_mtf <- mv_mtf_onehot
-# mv_mtf
+mv_mtf_org <- load_multiverse("orben2019nhb_mtf")
+mv_mtf_onehot <- mv_mtf_org |>
+  expand_y_variable()
+mv_mtf <- mv_mtf_onehot
+mv_mtf
 ```
 
 ```{r mcs-load-data}
-# mv_mcs_org <- load_multiverse("orben2019nhb_mcs_total")
-# mv_mcs_onehot <- mv_mcs_org |>
-#   expand_y_variable()
-# mv_mcs <- mv_mcs_onehot
-# mv_mcs
+mv_mcs_org <- load_multiverse("orben2019nhb_mcs_total")
+mv_mcs_onehot <- mv_mcs_org |>
+  expand_y_variable()
+mv_mcs <- mv_mcs_onehot
+mv_mcs
 ```
 
 # Analysis
@@ -72,3 +72,72 @@ decide_range_max_yrbs
 vis_importance(decide_range_max_yrbs)
 ```
 
+## MTF
+
+```{r}
+mv_mtf
+```
+
+DECIDE default score
+
+```{r mtf-between-bucket}
+decide_mtf <- calc_between_bucket_variation(mv_mtf, colname_metric = "effect") |>
+  aggregate_onehot_importances()
+decide_mtf
+```
+
+```{r mtf-between-bucket-plot}
+vis_importance(decide_mtf)
+```
+
+Try out other functions
+
+```{r decide-range-max-mtf}
+decide_range_max_mtf <- calc_between_bucket_variation(
+  mv_mtf,
+  colname_metric = "effect",
+  fun_spread = function(x) { diff(range(x)) },
+  fun_summary = max
+) |>
+  aggregate_onehot_importances()
+decide_range_max_mtf
+```
+
+```{r decide-range-max-mtf-vis}
+vis_importance(decide_range_max_mtf)
+```
+
+## MCS
+
+```{r}
+mv_mcs
+```
+
+DECIDE default score
+
+```{r mcs-between-bucket}
+decide_mcs <- calc_between_bucket_variation(mv_mcs, colname_metric = "effect") |>
+  aggregate_onehot_importances()
+decide_mcs
+```
+
+```{r mcs-between-bucket-plot}
+vis_importance(decide_mcs)
+```
+
+Try out other functions
+
+```{r decide-range-max-mcs}
+decide_range_max_mcs <- calc_between_bucket_variation(
+  mv_mcs,
+  colname_metric = "effect",
+  fun_spread = function(x) { diff(range(x)) },
+  fun_summary = max
+) |>
+  aggregate_onehot_importances()
+decide_range_max_mcs
+```
+
+```{r decide-range-max-mcs-vis}
+vis_importance(decide_range_max_mcs)
+```
