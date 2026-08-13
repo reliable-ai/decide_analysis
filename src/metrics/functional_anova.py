@@ -46,7 +46,9 @@ class MultiverseFanova:
         Returns:
         - A pandas DataFrame containing the encoded features.
         """
-        encoded = OrdinalEncoder().fit(features).transform(features).astype(int)
+        # float conversionsilences warning since fanova expects float values
+        # int conversion needed first since its categorical
+        encoded = OrdinalEncoder().fit(features).transform(features).astype(int).astype(float)
         return pd.DataFrame(encoded, columns=features.columns)
 
     def generate_configuration_space(self) -> ConfigurationSpace:
