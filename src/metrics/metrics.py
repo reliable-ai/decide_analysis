@@ -323,9 +323,6 @@ def decide(
             .apply(lambda s: summary(s.to_numpy()))
         )
 
-    # var_total is the same scalar for every subset (total spread of outcomes).
-    var_total = float(spread(multiverse_results[perf_col].to_numpy()))
-
     # --- main effects: Phi_{s_S}(Lambda_{p_{-S}}(f)) for every subset ---
     main_effect = {}
     for size in range(1, max_order + 1):
@@ -429,9 +426,8 @@ def decide(
     decomposition = {}
     for target_dims in main_effect:
         entry = {
-            "var_total": var_total,
-            "main_effect": main_effect[target_dims],
             "total_effect": total_effect[target_dims],
+            "main_effect": main_effect[target_dims],
         }
         # interaction_effect(S) == main_effect(S) for |S| == 1 by construction
         # (see the recursion above), so it's only reported for |S| >= 2 to

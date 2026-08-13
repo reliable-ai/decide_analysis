@@ -24,7 +24,13 @@ calc_within_bucket_variation <- function (mv, colname_metric, dim_prefix = "mv_d
   decreases
 }
 
-calc_between_bucket_variation <- function (mv, colname_metric, dim_prefix = "mv_dim_") {
+calc_between_bucket_variation <- function (
+  mv,
+  colname_metric,
+  dim_prefix = "mv_dim_",
+  fun_spread = var,
+  fun_summary = mean
+) {
   dims <- mv |> select(starts_with(dim_prefix)) |> colnames()
 
   result <- setNames(numeric(length(dims)), dims)
@@ -34,9 +40,9 @@ calc_between_bucket_variation <- function (mv, colname_metric, dim_prefix = "mv_
 
     group_vars <- mv |>
       group_by(across(all_of(other_dims))) |>
-      summarise(v = var(.data[[colname_metric]]), .groups = "drop")
+      summarise(v = fun_spread(.data[[colname_metric]]), .groups = "drop")
 
-    result[target_dim] <- mean(group_vars$v)
+    result[target_dim] <- fun_summary(group_vars$v)
   }
 
   result

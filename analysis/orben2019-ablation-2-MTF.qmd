@@ -1,0 +1,69 @@
+---
+title: "Ablation Study: Orben 2019 (NHB) - MTF"
+format: pdf
+---
+
+```{r setup}
+source("R/_load.R")
+```
+
+This document contains the ablation study for the MTF multiverse dataset from
+Orben & Przybylski (2019, *Nature Human Behaviour*). Every decision is fixed
+to one option in turn, importance estimates are recomputed on the reduced
+multiverse, and the resulting importance vectors are compared across methods
+and across options of the fixed decision.
+
+```{r mtf-load-data}
+mv_mtf <- load_multiverse("orben2019nhb_mtf") |>
+  expand_y_variable()
+```
+
+## Ablation Study
+
+```{r mtf-ablation-run}
+ablation_mtf <- run_ablation_analysis(mv_mtf, colname_metric = "effect")
+```
+
+### Inter-method stability
+
+```{r mtf-ablation-inter-method-table}
+ablation_mtf$inter_method_stability_summary |>
+  mutate(
+    fixed_decision_label = if_else(
+      fixed_decision == "full_multiverse",
+      "full multiverse",
+      fixed_decision_label
+    )
+  ) |>
+  select(
+    fixed_decision_label,
+    method_x,
+    method_y,
+    mean_rank_correlation,
+    min_rank_correlation
+  )
+```
+
+```{r mtf-ablation-inter-method-plot}
+#| fig-width: 6
+#| fig-height: 4.5
+vis_inter_method_stability(ablation_mtf$inter_method_stability_summary) +
+  theme(legend.position = "none")
+```
+
+### Intra-method stability
+
+```{r mtf-ablation-intra-method-table}
+ablation_mtf$intra_method_stability_summary |>
+  select(
+    fixed_decision_label,
+    method,
+    mean_rank_correlation,
+    min_rank_correlation,
+    mean_abs_difference
+  )
+```
+
+```{r mtf-ablation-intra-method-plot}
+vis_intra_method_stability(ablation_mtf$intra_method_stability_summary)
+```
