@@ -17,7 +17,7 @@ from fanova import fANOVA
 
 
 class MultiverseFanova:
-    def __init__(self, features: pd.DataFrame, outcome: pd.Series) -> None:
+    def __init__(self, features: pd.DataFrame, outcome: pd.Series, **fanova_kwargs) -> None:
         """
         Initializes a new MultiverseFanova instance.
 
@@ -32,7 +32,7 @@ class MultiverseFanova:
         """
         self.fanova_features = self.process_features(features)
         self.fanova_outcome = outcome
-
+        self.fanova_kwargs = fanova_kwargs
         self.configuration_space = self.generate_configuration_space()
         self.fanova = self.init_fanova()
 
@@ -79,6 +79,7 @@ class MultiverseFanova:
             self.fanova_features,
             self.fanova_outcome,
             config_space=self.configuration_space,
+            **self.fanova_kwargs
         )
 
     def quantify_importance(self, save_to: Optional[Path] = None):
