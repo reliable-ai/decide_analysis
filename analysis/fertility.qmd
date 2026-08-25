@@ -133,29 +133,21 @@ fanova_fert |>
 
 # Our Framework
 
-```{r fertility-within-bucket}
-within_fert <- calc_within_bucket_variation(mv_fert, colname_metric = "fertility_low_estimate")
-within_fert
+```{r fertility-decide}
+decide_fert <- decide(mv_fert, colname_metric = "fertility_low_estimate")
+decide_fert
 ```
 
-```{r fertility-within-bucket-plot}
-vis_importance(within_fert)
-```
-
-```{r fertility-between-bucket}
-between_fert <- calc_between_bucket_variation(mv_fert, colname_metric = "fertility_low_estimate")
-between_fert
-```
-
-```{r fertility-between-bucket-plot}
-vis_importance(between_fert)
+```{r fertility-decide-plot}
+decide_vec(mv_fert, colname_metric = "fertility_low_estimate") |>
+  vis_importance()
 ```
 
 ## Combine
 
 ```{r fertility-combine-importance}
 vis_importance_2dim(
-  between_fert,
+  decide_vec(mv_fert, colname_metric = "fertility_low_estimate"),
   fanova_fert |> fanova_to_vec()
 )
 ```

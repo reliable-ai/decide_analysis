@@ -134,30 +134,22 @@ fanova_hurr |>
 
 # Our Framework
 
-```{r hurricane-within-bucket}
-within_hurr <- calc_within_bucket_variation(mv_hurr, colname_metric = "expected_deaths_diff")
-within_hurr
+```{r hurricane-decide}
+decide_hurr <- decide(mv_hurr, colname_metric = "expected_deaths_diff")
+decide_hurr
 ```
 
-```{r hurricane-within-bucket-plot}
-vis_importance(within_hurr)
-```
-
-```{r hurricane-between-bucket}
-between_hurr <- calc_between_bucket_variation(mv_hurr, colname_metric = "expected_deaths_diff")
-between_hurr
-```
-
-```{r hurricane-between-bucket-plot}
+```{r hurricane-decide-plot}
 # NA leads to problem
-vis_importance(between_hurr)
+decide_vec(mv_hurr, colname_metric = "expected_deaths_diff") |>
+  vis_importance()
 ```
 
 ## Combine
 
 ```{r hurricane-combine-importance}
 vis_importance_2dim(
-  between_hurr,
+  decide_vec(mv_hurr, colname_metric = "expected_deaths_diff"),
   fanova_hurr |> fanova_to_vec()
 )
 ```

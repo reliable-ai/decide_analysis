@@ -155,29 +155,21 @@ fanova_siab |>
 
 # Our Framework
 
-```{r siab-within-bucket}
-within_siab <- calc_within_bucket_variation(mv_siab, colname_metric = "perf_acc")
-within_siab
+```{r siab-decide}
+decide_siab <- decide(mv_siab, colname_metric = "perf_acc")
+decide_siab
 ```
 
-```{r siab-within-bucket-plot}
-vis_importance(within_siab)
-```
-
-```{r siab-between-bucket}
-between_siab <- calc_between_bucket_variation(mv_siab, colname_metric = "perf_acc")
-between_siab
-```
-
-```{r siab-between-bucket-plot}
-vis_importance(between_siab)
+```{r siab-decide-plot}
+decide_vec(mv_siab, colname_metric = "perf_acc") |>
+  vis_importance()
 ```
 
 ## Combine
 
 ```{r siab-combine-importance}
 vis_importance_2dim(
-  between_siab,
+  decide_vec(mv_siab, colname_metric = "perf_acc"),
   fanova_siab |> fanova_to_vec()
 )
 ```

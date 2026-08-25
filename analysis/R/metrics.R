@@ -263,3 +263,17 @@ decide <- function (
       arrange(desc(decide_total))
   )
 }
+
+# Order-1 decide_total from decide(), as a named numeric vector keyed by
+# dimension name. A drop-in replacement for the old (sample-variance-based)
+# calc_between_bucket_variation() wherever a single importance-per-decision
+# vector is expected, e.g. vis_importance(), vis_importance_2dim(),
+# aggregate_onehot_importances(), or the ablation pipeline in R/ablation.R.
+decide_vec <- function (mv, colname_metric, dim_prefix = "mv_dim_",
+                        spread = pop_var, summary = mean) {
+  decide(
+    mv, colname_metric,
+    max_order = 1, spread = spread, summary = summary, dim_prefix = dim_prefix
+  ) |>
+    (\(tbl) setNames(tbl$decide_total, tbl$dimension))()
+}

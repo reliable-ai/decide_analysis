@@ -28,9 +28,7 @@ calc_importance_methods <- function (mv, colname_metric, dim_prefix = "mv_dim_",
       post_process_importances(),
     fanova = calc_fanova_main_effects(mv, colname_metric, dim_prefix = dim_prefix) |>
       post_process_importances(),
-    within = calc_within_bucket_variation(mv, colname_metric, dim_prefix = dim_prefix) |>
-      post_process_importances(),
-    between = calc_between_bucket_variation(mv, colname_metric, dim_prefix = dim_prefix) |>
+    decide = decide_vec(mv, colname_metric, dim_prefix = dim_prefix) |>
       post_process_importances()
   )
 }

@@ -206,32 +206,23 @@ fanova_yrbs |>
 
 ## Our Framework
 
-```{r yrbs-within-bucket}
-within_yrbs <- calc_within_bucket_variation(mv_yrbs, colname_metric = "effect") |> 
+```{r yrbs-decide}
+decide_yrbs <- decide(mv_yrbs, colname_metric = "effect")
+decide_yrbs
+```
+
+```{r yrbs-decide-plot}
+decide_vec_yrbs <- decide_vec(mv_yrbs, colname_metric = "effect") |>
   aggregate_onehot_importances()
-within_yrbs
-```
-
-```{r yrbs-within-bucket-plot}
-vis_importance(within_yrbs)
-```
-
-```{r yrbs-between-bucket}
-between_yrbs <- calc_between_bucket_variation(mv_yrbs, colname_metric = "effect") |> 
-  aggregate_onehot_importances()
-between_yrbs
-```
-
-```{r yrbs-between-bucket-plot}
-vis_importance(between_yrbs)
+vis_importance(decide_vec_yrbs)
 ```
 
 ### Combine
 
 ```{r yrbs-combine-importance}
 vis_importance_2dim(
-  between_yrbs,
-  fanova_yrbs |> fanova_to_vec() |> 
+  decide_vec_yrbs,
+  fanova_yrbs |> fanova_to_vec() |>
   aggregate_onehot_importances()
 )
 ```
@@ -323,32 +314,23 @@ fanova_mtf |>
 
 ## Our Framework
 
-```{r mtf-within-bucket} 
-within_mtf <- calc_within_bucket_variation(mv_mtf, colname_metric = "effect") |> 
+```{r mtf-decide}
+decide_mtf <- decide(mv_mtf, colname_metric = "effect")
+decide_mtf
+```
+
+```{r mtf-decide-plot}
+decide_vec_mtf <- decide_vec(mv_mtf, colname_metric = "effect") |>
   aggregate_onehot_importances()
-within_mtf
-```
-
-```{r mtf-within-bucket-plot}
-vis_importance(within_mtf)
-```
-
-```{r mtf-between-bucket}
-between_mtf <- calc_between_bucket_variation(mv_mtf, colname_metric = "effect") |> 
-  aggregate_onehot_importances()
-between_mtf
-```
-
-```{r mtf-between-bucket-plot}
-vis_importance(between_mtf)
+vis_importance(decide_vec_mtf)
 ```
 
 ### Combine
 
 ```{r mtf-combine-importance}
 vis_importance_2dim(
-  between_mtf,
-  fanova_mtf |> fanova_to_vec() |> 
+  decide_vec_mtf,
+  fanova_mtf |> fanova_to_vec() |>
   aggregate_onehot_importances()
 )
 ```
@@ -442,31 +424,22 @@ fanova_mcs |>
 
 ## Our Framework
 
-```{r mcs-within-bucket}
-within_mcs <- calc_within_bucket_variation(mv_mcs, colname_metric = "effect") |> 
+```{r mcs-decide}
+decide_mcs <- decide(mv_mcs, colname_metric = "effect")
+decide_mcs
+```
+
+```{r mcs-decide-plot}
+decide_vec_mcs <- decide_vec(mv_mcs, colname_metric = "effect") |>
   aggregate_onehot_importances()
-within_mcs
-```
-
-```{r mcs-within-bucket-plot}
-vis_importance(within_mcs)
-```
-
-```{r mcs-between-bucket}
-between_mcs <- calc_between_bucket_variation(mv_mcs, colname_metric = "effect") |> 
-  aggregate_onehot_importances()
-between_mcs
-```
-
-```{r mcs-between-bucket-plot}
-vis_importance(between_mcs)
+vis_importance(decide_vec_mcs)
 ```
 
 ### Combine
 
 ```{r mcs-combine-importance}
 vis_importance_2dim(
-  between_mcs,
+  decide_vec_mcs,
   fanova_mcs |> fanova_to_vec()
 )
 ```
