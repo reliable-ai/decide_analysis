@@ -15,7 +15,7 @@ source("R/_load.R")
 mv_yrbs_org <- load_multiverse("orben2019nhb_yrbs")
 mv_yrbs_onehot <- mv_yrbs_org |>
   expand_y_variable()
-mv_yrbs <- mv_yrbs_onehot
+mv_yrbs <- mv_yrbs_org
 mv_yrbs
 ```
 
@@ -23,7 +23,7 @@ mv_yrbs
 mv_mtf_org <- load_multiverse("orben2019nhb_mtf")
 mv_mtf_onehot <- mv_mtf_org |>
   expand_y_variable()
-mv_mtf <- mv_mtf_onehot
+mv_mtf <- mv_yrbs_org
 mv_mtf
 ```
 
@@ -31,7 +31,7 @@ mv_mtf
 mv_mcs_org <- load_multiverse("orben2019nhb_mcs_total")
 mv_mcs_onehot <- mv_mcs_org |>
   expand_y_variable()
-mv_mcs <- mv_mcs_onehot
+mv_mcs <- mv_yrbs_org
 mv_mcs
 ```
 
