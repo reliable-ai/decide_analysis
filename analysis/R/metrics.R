@@ -219,16 +219,17 @@ decide <- function (mv, colname_metric, max_order = 1, spread = pop_var,
     return(summary(phi$phi))
   }, numeric(1))
 
+  var_total <- spread(mv[[colname_metric]])
+
   return(tibble(
-    dimensions = subsets,
-    order = lengths(subsets),
-    # var_total is the same scalar for every subset (total spread of outcomes)
-    var_total = spread(mv[[colname_metric]]),
-    main_effect = unname(main_effect),
+    dimensions = subsets |> unlist(),
     total_effect = unname(total_effect),
-    # interaction_effect(S) == main_effect(S) for |S| == 1 by construction (see
-    # the recursion above), so it is only reported for |S| >= 2 to avoid
-    # encoding the same number under two names
-    interaction_effect = if_else(order >= 2, unname(interaction_effect), NA_real_)
-  ))
+    main_effect = unname(main_effect),
+    ratio_total_var = total_effect / var_total,
+    ratio_main = main_effect / total_effect,
+    # var_total is the same scalar for every subset (total spread of outcomes)
+    var_total = var_total
+  ) |>
+    arrange(desc(total_effect))
+  )
 }
