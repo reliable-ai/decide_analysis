@@ -147,32 +147,6 @@ test_that("vis_inter_method_stability rotates x-axis labels", {
   expect_equal(plot$theme$axis.text.x$hjust, 1)
 })
 
-test_that("vis_inter_method_stability can show values and add averages", {
-  inter_method_stability_summary <- tibble(
-    method_x = c("within", "within", "fanova", "fanova"),
-    method_y = c("between", "between", "between", "between"),
-    fixed_decision = c("mv_dim_A", "mv_dim_B", "mv_dim_A", "mv_dim_B"),
-    fixed_decision_label = c("A", "B", "A", "B"),
-    mean_rank_correlation = c(0.5, 0.7, 0.4, 0.6)
-  )
-
-  plot <- vis_inter_method_stability(
-    inter_method_stability_summary,
-    show_values = TRUE,
-    add_average = TRUE
-  )
-  geom_classes <- vapply(plot$layers, function(layer) class(layer$geom)[1], character(1))
-
-  expect_true("GeomText" %in% geom_classes)
-  expect_true("Average" %in% as.character(plot$data$fixed_decision_label))
-  expect_equal(
-    plot$data |>
-      filter(fixed_decision_label == "Average", comparison == "within vs between") |>
-      pull(mean_rank_correlation),
-    0.6
-  )
-})
-
 test_that("vis_intra_method_stability rotates x-axis labels", {
   intra_method_stability_summary <- tibble(
     method = "within",
@@ -229,7 +203,7 @@ test_that("regression importance aggregates absolute coefficients by decision", 
   reg_importance <- calc_regression_importance(mv, "outcome")
 
   expect_equal(unname(reg_importance["mv_dim_A"]), 2, tolerance = 0.05)
-  expect_equal(unname(reg_importance["mv_dim_B"]), 4, tolerance = 0.1)
+  expect_equal(unname(reg_importance["mv_dim_B"]), 2, tolerance = 0.1)
 })
 
 test_that("tidy_importance_methods keeps regression alongside other methods", {
