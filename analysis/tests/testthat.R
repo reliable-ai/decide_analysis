@@ -8,4 +8,4 @@
 
 library(testthat)
 
-test_dir("testthat")
+test_dir("tests/testthat")
