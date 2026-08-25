@@ -138,8 +138,15 @@ naive_tree_based_importance <- function (mv, colname_metric, dim_prefix = "mv_di
 # list-column of dimension names), `order`, `var_total`, `main_effect`,
 # `total_effect` and `interaction_effect`, the last of which is NA for subsets
 # with |S| == 1 (see interaction_effect above).
-decide <- function (mv, colname_metric, max_order = 1, spread = pop_var,
-                    summary = mean, dim_prefix = "mv_dim_") {
+decide <- function (
+  mv,
+  colname_metric,
+  max_order = 1,
+  spread = pop_var,
+  summary = mean,
+  report_all = FALSE,
+  dim_prefix = "mv_dim_"
+) {
   dims <- mv |> select(starts_with(dim_prefix)) |> colnames()
 
   if (is.null(max_order)) max_order <- length(dims)
@@ -219,17 +226,40 @@ decide <- function (mv, colname_metric, max_order = 1, spread = pop_var,
     return(summary(phi$phi))
   }, numeric(1))
 
-  var_total <- spread(mv[[colname_metric]])
+  total_spread <- spread(mv[[colname_metric]])
 
-  return(tibble(
-    dimensions = subsets |> unlist(),
-    total_effect = unname(total_effect),
-    main_effect = unname(main_effect),
-    ratio_total_var = total_effect / var_total,
-    ratio_main = main_effect / total_effect,
-    # var_total is the same scalar for every subset (total spread of outcomes)
-    var_total = var_total
-  ) |>
-    arrange(desc(total_effect))
+  results <- tibble(
+    dimension = subsets |> unlist(),
+    decide_total = unname(total_effect),
+    decide_main = unname(main_effect),
+    decide_interactions = unname(interaction_effect),
+
+    ratio_main = decide_main / decide_total,
+    ratio_interactions = interaction_effect / decide_total,
+    total_spread = total_spread
+  )
+
+  # Default scores to report
+  main_scores <- c(
+    "dimension",
+    "decide_total",
+    "decide_main",
+    "ratio_main"
+  )
+  if (!report_all) {
+    # If report_all isn't set, report only the most important scores
+    results <- results |>
+      select(all_of(main_scores))
+  }
+
+  # Only report share_var_total if its assumptions are met
+  # i.e. summary function is mean, spread function is var()
+  if (identical(summary, mean) && (identical(spread, pop_var) || identical(spread, var))) {
+    results$share_var_total <- results$decide_total / total_spread
+  }
+
+  return(
+    results |>
+      arrange(desc(decide_total))
   )
 }

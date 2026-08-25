@@ -21,6 +21,13 @@ test_that("decide produces expected results", {
     expect_snapshot()
 })
 
+test_that("decide produces expected results (when reporting all scores)", {
+  mv <- make_example_multiverse()
+
+  decide(mv, "accuracy", report_all = TRUE) |>
+    expect_snapshot()
+})
+
 test_that("decide's order-1 total_effect matches calc_between_bucket_variation", {
   # calc_between_bucket_variation is a special case of decide()'s total_effect:
   # single-dimension subsets on a full-factorial multiverse (no imputation
@@ -37,7 +44,7 @@ test_that("decide's order-1 total_effect matches calc_between_bucket_variation",
     mv, "accuracy",
     max_order = 1, spread = pop_var, summary = mean
   ) |>
-    (\(tbl) setNames(tbl$total_effect, unlist(tbl$dimensions)))()
+    (\(tbl) setNames(tbl$decide_total, unlist(tbl$dimension)))()
 
   expect_equal(
     decide_total_effect[names(between_bucket)],
