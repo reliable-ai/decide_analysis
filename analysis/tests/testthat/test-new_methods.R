@@ -17,12 +17,15 @@ make_example_multiverse <- function() {
 
 test_that("calc_within_bucket_variation produces expected results", {
   mv <- make_example_multiverse()
-  result <- calc_within_bucket_variation(mv, "accuracy")
-  expect_snapshot(round(result, 10))
+  calc_within_bucket_variation(mv, "accuracy") |>
+    round(10) |>
+    expect_snapshot()
 })
 
 test_that("calc_between_bucket_variation produces expected results", {
   mv <- make_example_multiverse()
-  result <- calc_between_bucket_variation(mv, "accuracy")
-  expect_snapshot(round(result, 10))
+
+  calc_between_bucket_variation(mv, "accuracy") |>
+    round(10) |>
+    expect_snapshot()
 })
