@@ -1,9 +1,12 @@
-# Takes importances_vec and aggregate any values starting with the prefix into
-# one using prefix as the new key.
-aggregate_onehot_importances <- function(importances_vec, prefix = "mv_dim_y_") {
+# Takes importances_vec and aggregates any values whose name starts with
+# `prefix` into a single entry named `col` (the original, non-expanded column
+# name). This reverses expand_y_variable() for importance vectors, so it is a
+# no-op when `importances_vec` already has a single mv_dim_y_variable entry.
+aggregate_onehot_importances <- function(importances_vec, prefix = "mv_dim_y_",
+                                          col = "mv_dim_y_variable") {
   matching_prefix <- names(importances_vec) |> str_starts(prefix)
   vec_new <- importances_vec[!matching_prefix]
-  vec_new[prefix] <- sum(importances_vec[matching_prefix])
+  vec_new[col] <- sum(importances_vec[matching_prefix])
   vec_new
 }
 

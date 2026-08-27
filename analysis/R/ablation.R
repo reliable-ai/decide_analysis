@@ -18,13 +18,17 @@ tidy_importance_methods <- function (importance_by_method, dim_prefix = "mv_dim_
 }
 
 # Default to using individual for better comparability
-calc_importance_methods <- function (mv, colname_metric, dim_prefix = "mv_dim_", post_process_importances = NULL) {
+calc_importance_methods <- function (mv, colname_metric, dim_prefix = "mv_dim_",
+                                      post_process_importances = NULL,
+                                      regression_mv_pre_process = identity,
+                                      regression_post_process = identity) {
   if (is.null(post_process_importances)) {
     post_process_importances = function (x) { return(x) }
   }
 
   list(
-    regression = calc_regression_importance(mv, colname_metric, dim_prefix = dim_prefix) |>
+    regression = calc_regression_importance(regression_mv_pre_process(mv), colname_metric, dim_prefix = dim_prefix) |>
+      regression_post_process() |>
       post_process_importances(),
     fanova = calc_fanova_main_effects(mv, colname_metric, dim_prefix = dim_prefix) |>
       post_process_importances(),
@@ -141,7 +145,9 @@ calc_ablation_importance <- function (
   colname_metric,
   dim_prefix = "mv_dim_",
   prefixes = character(0),
-  post_process_importances = NULL
+  post_process_importances = NULL,
+  regression_mv_pre_process = identity,
+  regression_post_process = identity
 ) {
   ablation_grid <- build_ablation_grid(mv, prefixes = prefixes, dim_prefix = dim_prefix)
 
@@ -161,7 +167,9 @@ calc_ablation_importance <- function (
           ablated_mv,
           colname_metric = colname_metric,
           dim_prefix = dim_prefix,
-          post_process_importances = post_process_importances
+          post_process_importances = post_process_importances,
+          regression_mv_pre_process = regression_mv_pre_process,
+          regression_post_process = regression_post_process
         ),
         dim_prefix = dim_prefix
       ) |>
@@ -284,10 +292,20 @@ summarise_method_stability <- summarise_inter_method_stability
 # 2) recompute importance after fixing each decision to each option,
 # 3) compare methods within each ablated setting,
 # 4) compare each method's full-multiverse importances to its ablated variants.
-run_ablation_analysis <- function (mv, colname_metric, dim_prefix = "mv_dim_", prefixes = character(0), post_process_importances = NULL) {
+run_ablation_analysis <- function (mv, colname_metric, dim_prefix = "mv_dim_", prefixes = character(0),
+                                    post_process_importances = NULL,
+                                    regression_mv_pre_process = identity,
+                                    regression_post_process = identity) {
   # Baseline: importances computed on the full multiverse (no fixed decision).
   baseline_importance <- tidy_importance_methods(
-    calc_importance_methods(mv, colname_metric = colname_metric, dim_prefix = dim_prefix, post_process_importances = post_process_importances),
+    calc_importance_methods(
+      mv,
+      colname_metric = colname_metric,
+      dim_prefix = dim_prefix,
+      post_process_importances = post_process_importances,
+      regression_mv_pre_process = regression_mv_pre_process,
+      regression_post_process = regression_post_process
+    ),
     dim_prefix = dim_prefix
   )
 
@@ -297,7 +315,9 @@ run_ablation_analysis <- function (mv, colname_metric, dim_prefix = "mv_dim_", p
     colname_metric = colname_metric,
     dim_prefix = dim_prefix,
     prefixes = prefixes,
-    post_process_importances = post_process_importances
+    post_process_importances = post_process_importances,
+    regression_mv_pre_process = regression_mv_pre_process,
+    regression_post_process = regression_post_process
   )
 
   # Add the full-multiverse baseline as a reference pseudo-setting so method

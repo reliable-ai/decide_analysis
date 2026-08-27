@@ -14,14 +14,22 @@ multiverse, and the resulting importance vectors are compared across methods
 and across options of the fixed decision.
 
 ```{r mtf-load-data}
-mv_mtf <- load_multiverse("orben2019nhb_mtf") |>
-  expand_y_variable()
+mv_mtf <- load_multiverse("orben2019nhb_mtf")
 ```
 
 ## Ablation Study
 
+`mv_dim_y_variable` is only one-hot encoded (via `expand_y_variable()`) for the
+regression method, since it needs a numeric design matrix; FANOVA and DECIDE
+use it as-is.
+
 ```{r mtf-ablation-run}
-ablation_mtf <- run_ablation_analysis(mv_mtf, colname_metric = "effect")
+ablation_mtf <- run_ablation_analysis(
+  mv_mtf,
+  colname_metric = "effect",
+  regression_mv_pre_process = expand_y_variable,
+  regression_post_process = aggregate_onehot_importances
+)
 ```
 
 ### Inter-method stability

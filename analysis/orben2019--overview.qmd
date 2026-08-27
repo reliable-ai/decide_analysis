@@ -9,7 +9,7 @@ source("R/_load.R")
 
 This document analyses the three multiverse datasets from Orben & Przybylski (2019, *Nature Human Behaviour*): MCS Total, MTF, and YRBS.
 The outcome metric used throughout is the regression effect size (`effect`).
-`mv_dim_y_variable` is expanded into per-variable binary indicator columns before any analysis.
+`mv_dim_y_variable` is used as-is (a single comma-separated categorical decision) everywhere except regression, where it is expanded into per-variable binary indicator columns (via `expand_y_variable()`) since `lm()` needs a numeric design matrix.
 
 ---
 
@@ -21,7 +21,7 @@ The outcome metric used throughout is the regression effect size (`effect`).
 mv_yrbs_org <- load_multiverse("orben2019nhb_yrbs")
 mv_yrbs_onehot <- mv_yrbs_org |>
   expand_y_variable()
-mv_yrbs <- mv_yrbs_onehot
+mv_yrbs <- mv_yrbs_org
 mv_yrbs
 ```
 
@@ -29,7 +29,7 @@ mv_yrbs
 mv_mtf_org <- load_multiverse("orben2019nhb_mtf")
 mv_mtf_onehot <- mv_mtf_org |>
   expand_y_variable()
-mv_mtf <- mv_mtf_onehot
+mv_mtf <- mv_mtf_org
 mv_mtf
 ```
 
@@ -37,7 +37,7 @@ mv_mtf
 mv_mcs_org <- load_multiverse("orben2019nhb_mcs_total")
 mv_mcs_onehot <- mv_mcs_org |>
   expand_y_variable()
-mv_mcs <- mv_mcs_onehot
+mv_mcs <- mv_mcs_org
 mv_mcs
 ```
 
@@ -126,7 +126,7 @@ vis_multiverse_simple(mv_mcs, direction = "right")
 ### Regression
 
 ```{r yrbs-regression-fit}
-reg_yrbs <- calc_regression(mv_yrbs, colname_metric = "effect")
+reg_yrbs <- calc_regression(mv_yrbs_onehot, colname_metric = "effect")
 attr(reg_yrbs, "tidy")
 ```
 
@@ -180,7 +180,7 @@ vis_regression_coefficients(reg_yrbs)
 #### Importance
 
 ```{r yrbs-regression-importance}
-regimp_yrbs <- calc_regression_importance(mv_yrbs, colname_metric = "effect") |> 
+regimp_yrbs <- calc_regression_importance(mv_yrbs_onehot, colname_metric = "effect") |>
   aggregate_onehot_importances()
 regimp_yrbs
 ```
@@ -199,8 +199,7 @@ fanova_yrbs
 ```{r yrbs-fanova-importance-plot}
 fanova_yrbs |>
   head(10) |>
-  fanova_to_vec() |> 
-  aggregate_onehot_importances() |>
+  fanova_to_vec() |>
   vis_importance()
 ```
 
@@ -212,8 +211,7 @@ decide_yrbs
 ```
 
 ```{r yrbs-decide-plot}
-decide_vec_yrbs <- decide_vec(mv_yrbs, colname_metric = "effect") |>
-  aggregate_onehot_importances()
+decide_vec_yrbs <- decide_vec(mv_yrbs, colname_metric = "effect")
 vis_importance(decide_vec_yrbs)
 ```
 
@@ -222,8 +220,7 @@ vis_importance(decide_vec_yrbs)
 ```{r yrbs-combine-importance}
 vis_importance_2dim(
   decide_vec_yrbs,
-  fanova_yrbs |> fanova_to_vec() |>
-  aggregate_onehot_importances()
+  fanova_yrbs |> fanova_to_vec()
 )
 ```
 
@@ -236,7 +233,7 @@ vis_importance_2dim(
 ### Regression
 
 ```{r mtf-regression-fit}
-reg_mtf <- calc_regression(mv_mtf, colname_metric = "effect")
+reg_mtf <- calc_regression(mv_mtf_onehot, colname_metric = "effect")
 attr(reg_mtf, "tidy")
 ```
 
@@ -288,7 +285,7 @@ vis_regression_coefficients(reg_mtf)
 #### Importance
 
 ```{r mtf-regression-importance}
-regimp_mtf <- calc_regression_importance(mv_mtf, colname_metric = "effect") |> 
+regimp_mtf <- calc_regression_importance(mv_mtf_onehot, colname_metric = "effect") |>
   aggregate_onehot_importances()
 regimp_mtf
 ```
@@ -307,8 +304,7 @@ fanova_mtf
 ```{r mtf-fanova-importance-plot}
 fanova_mtf |>
   head(10) |>
-  fanova_to_vec() |> 
-  aggregate_onehot_importances() |>
+  fanova_to_vec() |>
   vis_importance()
 ```
 
@@ -320,8 +316,7 @@ decide_mtf
 ```
 
 ```{r mtf-decide-plot}
-decide_vec_mtf <- decide_vec(mv_mtf, colname_metric = "effect") |>
-  aggregate_onehot_importances()
+decide_vec_mtf <- decide_vec(mv_mtf, colname_metric = "effect")
 vis_importance(decide_vec_mtf)
 ```
 
@@ -330,8 +325,7 @@ vis_importance(decide_vec_mtf)
 ```{r mtf-combine-importance}
 vis_importance_2dim(
   decide_vec_mtf,
-  fanova_mtf |> fanova_to_vec() |>
-  aggregate_onehot_importances()
+  fanova_mtf |> fanova_to_vec()
 )
 ```
 
@@ -344,7 +338,7 @@ vis_importance_2dim(
 ### Regression
 
 ```{r mcs-regression-fit}
-reg_mcs <- calc_regression(mv_mcs, colname_metric = "effect")
+reg_mcs <- calc_regression(mv_mcs_onehot, colname_metric = "effect")
 attr(reg_mcs, "tidy")
 ```
 
@@ -398,7 +392,7 @@ vis_regression_coefficients(reg_mcs)
 #### Importance
 
 ```{r mcs-regression-importance}
-regimp_mcs <- calc_regression_importance(mv_mcs, colname_metric = "effect") |> 
+regimp_mcs <- calc_regression_importance(mv_mcs_onehot, colname_metric = "effect") |>
   aggregate_onehot_importances()
 regimp_mcs
 ```
@@ -418,7 +412,6 @@ fanova_mcs
 fanova_mcs |>
   head(10) |>
   fanova_to_vec() |>
-  aggregate_onehot_importances() |> 
   vis_importance()
 ```
 
@@ -430,8 +423,7 @@ decide_mcs
 ```
 
 ```{r mcs-decide-plot}
-decide_vec_mcs <- decide_vec(mv_mcs, colname_metric = "effect") |>
-  aggregate_onehot_importances()
+decide_vec_mcs <- decide_vec(mv_mcs, colname_metric = "effect")
 vis_importance(decide_vec_mcs)
 ```
 

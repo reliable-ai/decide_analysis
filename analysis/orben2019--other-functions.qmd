@@ -23,7 +23,7 @@ mv_yrbs
 mv_mtf_org <- load_multiverse("orben2019nhb_mtf")
 mv_mtf_onehot <- mv_mtf_org |>
   expand_y_variable()
-mv_mtf <- mv_yrbs_org
+mv_mtf <- mv_mtf_org
 mv_mtf
 ```
 
@@ -31,7 +31,7 @@ mv_mtf
 mv_mcs_org <- load_multiverse("orben2019nhb_mcs_total")
 mv_mcs_onehot <- mv_mcs_org |>
   expand_y_variable()
-mv_mcs <- mv_yrbs_org
+mv_mcs <- mv_mcs_org
 mv_mcs
 ```
 
@@ -46,8 +46,7 @@ mv_yrbs
 DECIDE default score
 
 ```{r yrbs-between-bucket}
-decide_yrbs <- decide_vec(mv_yrbs, colname_metric = "effect") |>
-  aggregate_onehot_importances()
+decide_yrbs <- decide_vec(mv_yrbs, colname_metric = "effect")
 decide_yrbs
 ```
 
@@ -63,8 +62,7 @@ decide_range_max_yrbs <- decide_vec(
   colname_metric = "effect",
   spread = function(x) { diff(range(x)) },
   summary = max
-) |>
-  aggregate_onehot_importances()
+)
 decide_range_max_yrbs
 ```
 
@@ -81,8 +79,7 @@ mv_mtf
 DECIDE default score
 
 ```{r mtf-between-bucket}
-decide_mtf <- decide_vec(mv_mtf, colname_metric = "effect") |>
-  aggregate_onehot_importances()
+decide_mtf <- decide_vec(mv_mtf, colname_metric = "effect")
 decide_mtf
 ```
 
@@ -98,8 +95,7 @@ decide_range_max_mtf <- decide_vec(
   colname_metric = "effect",
   spread = function(x) { diff(range(x)) },
   summary = max
-) |>
-  aggregate_onehot_importances()
+)
 decide_range_max_mtf
 ```
 
@@ -116,8 +112,7 @@ mv_mcs
 DECIDE default score
 
 ```{r mcs-between-bucket}
-decide_mcs <- decide_vec(mv_mcs, colname_metric = "effect") |>
-  aggregate_onehot_importances()
+decide_mcs <- decide_vec(mv_mcs, colname_metric = "effect")
 decide_mcs
 ```
 
@@ -133,8 +128,7 @@ decide_range_max_mcs <- decide_vec(
   colname_metric = "effect",
   spread = function(x) { diff(range(x)) },
   summary = max
-) |>
-  aggregate_onehot_importances()
+)
 decide_range_max_mcs
 ```
 
