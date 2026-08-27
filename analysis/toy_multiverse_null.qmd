@@ -1,0 +1,187 @@
+---
+title: "Toy Multiverse: Null Baseline"
+format: pdf
+---
+
+```{r setup}
+source("R/_load.R")
+```
+
+## Generate Toy multiverse
+
+```{r toy-generate}
+set.seed(42)
+
+toy_decisions <- list(
+  decision_1 = paste0("option_", seq_len(2)),
+  decision_2 = paste0("option_", seq_len(3)),
+  decision_3 = paste0("option_", seq_len(4)),
+  decision_4 = paste0("option_", seq_len(4)),
+  decision_5 = paste0("option_", seq_len(5))
+)
+
+mv_toy <- do.call(expand_grid, toy_decisions) |>
+  rename_with(~ paste0("mv_dim_", .x)) |>
+  mutate(across(everything(), as.factor)) |>
+  mutate(toy_outcome = rnorm(n()))
+
+mv_toy
+```
+
+# Overview
+
+```{r toy-decisions-overview}
+mv_toy |>
+  get_multiverse_decisions()
+```
+
+```{r toy-full-design-check}
+check_full_design(mv_toy)
+```
+
+```{r toy-multiverse-tree}
+#| fig-width: 11
+vis_multiverse_tree(mv_toy)
+```
+
+```{r toy-multiverse-simple}
+#| fig-width: 9
+vis_multiverse_simple(mv_toy, direction = "right")
+```
+
+# Existing Methods
+
+## Regression
+
+```{r toy-regression-fit}
+reg_toy <- calc_regression(mv_toy, colname_metric = "toy_outcome")
+attr(reg_toy, "tidy")
+```
+
+```{r toy-regression-coefficients}
+vis_regression_coefficients(reg_toy)
+```
+
+### Importance
+
+```{r toy-regression-importance}
+regimp_toy <- calc_regression_importance(
+  mv_toy,
+  colname_metric = "toy_outcome"
+)
+regimp_toy
+```
+
+```{r toy-regression-importance-plot}
+vis_importance(regimp_toy)
+```
+
+## FANOVA
+
+```{r toy-fanova-fit}
+fanova_toy <- calc_fanova(mv_toy, colname_metric = "toy_outcome")
+fanova_toy
+```
+
+```{r toy-fanova-importance-plot}
+fanova_toy |>
+  filter(is.na(level_1)) |>
+  fanova_to_vec() |>
+  vis_importance()
+```
+
+# Our Framework
+
+```{r toy-decide}
+decide_toy <- decide(mv_toy, colname_metric = "toy_outcome")
+decide_toy
+```
+
+```{r toy-decide-plot}
+decide_vec(mv_toy, colname_metric = "toy_outcome") |>
+  vis_importance()
+```
+
+## Combine
+
+```{r toy-combine-importance}
+vis_importance_2dim(
+  decide_vec(mv_toy, colname_metric = "toy_outcome"),
+  fanova_toy |> filter(is.na(level_1)) |> fanova_to_vec()
+)
+```
+
+# Ablation Study (not sure we need this)
+
+```{r toy-ablation-run}
+ablation_toy <- run_ablation_analysis(
+  mv_toy,
+  colname_metric = "toy_outcome"
+)
+```
+
+## Inter-method stability
+
+```{r toy-ablation-inter-method-table}
+ablation_toy$inter_method_stability_summary |>
+  mutate(
+    fixed_decision_label = if_else(
+      fixed_decision == "full_multiverse",
+      "full multiverse",
+      fixed_decision_label
+    )
+  ) |>
+  select(
+    fixed_decision_label,
+    method_x,
+    method_y,
+    mean_rank_correlation,
+    min_rank_correlation
+  )
+```
+
+```{r toy-ablation-inter-method-plot}
+#| fig-width: 6
+#| fig-height: 4.5
+vis_inter_method_stability(ablation_toy$inter_method_stability_summary)
+```
+
+## Intra-method stability
+
+```{r toy-ablation-intra-method-table}
+ablation_toy$intra_method_stability_summary |>
+  select(
+    fixed_decision_label,
+    method,
+    mean_rank_correlation,
+    min_rank_correlation,
+    mean_abs_difference
+  )
+```
+
+```{r toy-ablation-intra-method-plot}
+vis_intra_method_stability(ablation_toy$intra_method_stability_summary)
+```
+
+# Decisions
+
+```{r toy-decision-1}
+mv_toy |>
+  vis_decision(
+    mv_dim_decision_1,
+    type = "kde",
+    facet = TRUE,
+    colname_metric = "toy_outcome"
+  )
+```
+
+```{r toy-two-decisions}
+mv_toy |>
+  vis_two_decisions(
+    mv_dim_decision_3,
+    mv_dim_decision_4,
+    facet = TRUE,
+    type = "kde",
+    colname_metric = "toy_outcome"
+  )
+```
