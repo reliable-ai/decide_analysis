@@ -9,7 +9,7 @@ source("R/_load.R")
 
 This document analyses the three multiverse datasets from Orben & Przybylski (2019, *Nature Human Behaviour*): MCS Total, MTF, and YRBS.
 The outcome metric used throughout is the regression effect size (`effect`).
-`mv_dim_y_variable` is used as-is (a single comma-separated categorical decision) everywhere except regression, where it is expanded into per-variable binary indicator columns (via `expand_y_variable()`) since `lm()` needs a numeric design matrix.
+`mv_dim_y_variable` is used as-is (a single comma-separated categorical decision) for `decide()`, but expanded into per-variable binary indicator columns (via `expand_y_variable()`) for regression and FANOVA: `lm()` needs a numeric design matrix, and FANOVA errors out on the raw categorical with thousands of unique levels. Expanded importances are collapsed back to a single `mv_dim_y_variable` entry via `aggregate_onehot_importances()`.
 
 ---
 
@@ -192,14 +192,16 @@ vis_importance(regimp_yrbs)
 ### FANOVA
 
 ```{r yrbs-fanova-fit}
-fanova_yrbs <- calc_fanova(mv_yrbs, colname_metric = "effect", use_individual = TRUE)
+fanova_yrbs <- calc_fanova(mv_yrbs_onehot, colname_metric = "effect", use_individual = TRUE)
 fanova_yrbs
 ```
 
 ```{r yrbs-fanova-importance-plot}
 fanova_yrbs |>
-  head(10) |>
   fanova_to_vec() |>
+  aggregate_onehot_importances() |>
+  sort(decreasing = TRUE) |>
+  head(10) |>
   vis_importance()
 ```
 
@@ -220,7 +222,7 @@ vis_importance(decide_vec_yrbs)
 ```{r yrbs-combine-importance}
 vis_importance_2dim(
   decide_vec_yrbs,
-  fanova_yrbs |> fanova_to_vec()
+  fanova_yrbs |> fanova_to_vec() |> aggregate_onehot_importances()
 )
 ```
 
@@ -297,14 +299,16 @@ vis_importance(regimp_mtf)
 ### FANOVA
 
 ```{r mtf-fanova-fit}
-fanova_mtf <- calc_fanova(mv_mtf, colname_metric = "effect", use_individual = TRUE)
+fanova_mtf <- calc_fanova(mv_mtf_onehot, colname_metric = "effect", use_individual = TRUE)
 fanova_mtf
 ```
 
 ```{r mtf-fanova-importance-plot}
 fanova_mtf |>
-  head(10) |>
   fanova_to_vec() |>
+  aggregate_onehot_importances() |>
+  sort(decreasing = TRUE) |>
+  head(10) |>
   vis_importance()
 ```
 
@@ -325,7 +329,7 @@ vis_importance(decide_vec_mtf)
 ```{r mtf-combine-importance}
 vis_importance_2dim(
   decide_vec_mtf,
-  fanova_mtf |> fanova_to_vec()
+  fanova_mtf |> fanova_to_vec() |> aggregate_onehot_importances()
 )
 ```
 
@@ -404,14 +408,16 @@ vis_importance(regimp_mcs)
 ### FANOVA
 
 ```{r mcs-fanova-fit}
-fanova_mcs <- calc_fanova(mv_mcs, colname_metric = "effect", use_individual = TRUE)
+fanova_mcs <- calc_fanova(mv_mcs_onehot, colname_metric = "effect", use_individual = TRUE)
 fanova_mcs
 ```
 
 ```{r mcs-fanova-importance-plot}
 fanova_mcs |>
-  head(10) |>
   fanova_to_vec() |>
+  aggregate_onehot_importances() |>
+  sort(decreasing = TRUE) |>
+  head(10) |>
   vis_importance()
 ```
 
@@ -432,6 +438,6 @@ vis_importance(decide_vec_mcs)
 ```{r mcs-combine-importance}
 vis_importance_2dim(
   decide_vec_mcs,
-  fanova_mcs |> fanova_to_vec()
+  fanova_mcs |> fanova_to_vec() |> aggregate_onehot_importances()
 )
 ```

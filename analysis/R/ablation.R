@@ -1,6 +1,31 @@
-calc_fanova_main_effects <- function (mv, colname_metric, dim_prefix = "mv_dim_") {
+# fANOVA main / individual importance per decision (main effects only, no
+# interactions). This is the cheaper of the two fANOVA quantities.
+calc_fanova_main_importance <- function (mv, colname_metric, dim_prefix = "mv_dim_") {
   calc_fanova(mv, colname_metric, dim_prefix = dim_prefix, use_individual = TRUE) |>
     fanova_to_vec()
+}
+
+# fANOVA total importance per decision (main effect plus every interaction the
+# decision is involved in). Requires the full interaction decomposition, which
+# is markedly slower, hence gated behind a flag in the ablation pipeline.
+calc_fanova_total_importance <- function (mv, colname_metric, dim_prefix = "mv_dim_") {
+  calc_fanova(mv, colname_metric, dim_prefix = dim_prefix, use_individual = FALSE) |>
+    fanova_total_to_vec()
+}
+
+# DECIDE main effect and total effect per decision, as two named numeric vectors
+# keyed by dimension name.
+calc_decide_importances <- function (mv, colname_metric, dim_prefix = "mv_dim_",
+                                     spread = pop_var, summary = mean) {
+  decomposition <- decide(
+    mv, colname_metric,
+    max_order = 1, spread = spread, summary = summary, dim_prefix = dim_prefix
+  )
+
+  list(
+    decide_total = setNames(decomposition$decide_total, decomposition$dimension),
+    decide_main  = setNames(decomposition$decide_main, decomposition$dimension)
+  )
 }
 
 tidy_importance_methods <- function (importance_by_method, dim_prefix = "mv_dim_") {
@@ -17,24 +42,42 @@ tidy_importance_methods <- function (importance_by_method, dim_prefix = "mv_dim_
   )
 }
 
-# Default to using individual for better comparability
+# Computes named importance vectors per method.
 calc_importance_methods <- function (mv, colname_metric, dim_prefix = "mv_dim_",
                                       post_process_importances = NULL,
                                       regression_mv_pre_process = identity,
-                                      regression_post_process = identity) {
+                                      regression_post_process = identity,
+                                      fanova_mv_pre_process = identity,
+                                      fanova_post_process = identity,
+                                      include_fanova_total = TRUE) {
   if (is.null(post_process_importances)) {
     post_process_importances = function (x) { return(x) }
   }
 
-  list(
+  decide_importances <- calc_decide_importances(mv, colname_metric, dim_prefix = dim_prefix)
+
+  fanova_mv <- fanova_mv_pre_process(mv)
+
+  methods <- list(
     regression = calc_regression_importance(regression_mv_pre_process(mv), colname_metric, dim_prefix = dim_prefix) |>
       regression_post_process() |>
       post_process_importances(),
-    fanova = calc_fanova_main_effects(mv, colname_metric, dim_prefix = dim_prefix) |>
+    fanova_main = calc_fanova_main_importance(fanova_mv, colname_metric, dim_prefix = dim_prefix) |>
+      fanova_post_process() |>
       post_process_importances(),
-    decide = decide_vec(mv, colname_metric, dim_prefix = dim_prefix) |>
+    decide_main = decide_importances$decide_main |>
+      post_process_importances(),
+    decide_total = decide_importances$decide_total |>
       post_process_importances()
   )
+
+  if (include_fanova_total) {
+    methods$fanova_total <- calc_fanova_total_importance(fanova_mv, colname_metric, dim_prefix = dim_prefix) |>
+      fanova_post_process() |>
+      post_process_importances()
+  }
+
+  methods
 }
 
 safe_mean <- function (x) {
@@ -140,6 +183,17 @@ build_ablation_grid <- function (mv, prefixes = character(0), dim_prefix = "mv_d
   bind_rows(prefix_rows, individual_rows)
 }
 
+# An ablated multiverse is only usable if at least two decisions still vary in
+# it: with a single remaining decision every importance vector has length one,
+# so no rank correlation can be computed, and the model-based estimators break
+# down. This functions checks for these scenarios.
+is_usable_ablation <- function (ablated_mv, dim_prefix = "mv_dim_",
+                                min_decisions = 2, min_universes = 2) {
+  n_decisions <- ablated_mv |> select(starts_with(dim_prefix)) |> ncol()
+
+  n_decisions >= min_decisions && nrow(ablated_mv) >= min_universes
+}
+
 calc_ablation_importance <- function (
   mv,
   colname_metric,
@@ -147,7 +201,10 @@ calc_ablation_importance <- function (
   prefixes = character(0),
   post_process_importances = NULL,
   regression_mv_pre_process = identity,
-  regression_post_process = identity
+  regression_post_process = identity,
+  fanova_mv_pre_process = identity,
+  fanova_post_process = identity,
+  include_fanova_total = TRUE
 ) {
   ablation_grid <- build_ablation_grid(mv, prefixes = prefixes, dim_prefix = dim_prefix)
 
@@ -162,6 +219,17 @@ calc_ablation_importance <- function (
         dim_prefix = dim_prefix
       )
 
+      # Skip ablations that wouldn't work
+      if (!is_usable_ablation(ablated_mv, dim_prefix = dim_prefix)) {
+        message(
+          "Skipping broken ablation: ", fixed_decision_label, " = ", fixed_option,
+          " (", nrow(ablated_mv), " universes, ",
+          ablated_mv |> select(starts_with(dim_prefix)) |> ncol(),
+          " remaining decisions)"
+        )
+        return(tibble())
+      }
+
       tidy_importance_methods(
         calc_importance_methods(
           ablated_mv,
@@ -169,7 +237,10 @@ calc_ablation_importance <- function (
           dim_prefix = dim_prefix,
           post_process_importances = post_process_importances,
           regression_mv_pre_process = regression_mv_pre_process,
-          regression_post_process = regression_post_process
+          regression_post_process = regression_post_process,
+          fanova_mv_pre_process = fanova_mv_pre_process,
+          fanova_post_process = fanova_post_process,
+          include_fanova_total = include_fanova_total
         ),
         dim_prefix = dim_prefix
       ) |>
@@ -193,13 +264,21 @@ calc_ablation_importance <- function (
   )
 }
 
+# The base method a (possibly variant-suffixed) method name belongs to, e.g.
+# both `decide_main` and `decide_total` map to `decide`.
+method_family <- function (method) {
+  sub("_(main|total)$", "", method)
+}
+
 # Compares importance rankings between every pair of methods.
 # For each (fixed_decision, fixed_option), it correlates method-specific
 # importance vectors across target decisions after pivoting to wide format.
 # The reported rank_correlation is Spearman by default.
 calc_inter_method_stability <- function (importance_tbl, cor_method = "spearman") {
   methods <- unique(importance_tbl$method)
-  method_pairs <- combn(methods, 2, simplify = FALSE)
+  # Create compairson pairings, but skip comparisons between equal methods
+  method_pairs <- combn(methods, 2, simplify = FALSE) |>
+    purrr::keep(function (pair) method_family(pair[[1]]) != method_family(pair[[2]]))
 
   purrr::map_dfr(
     method_pairs,
@@ -295,7 +374,10 @@ summarise_method_stability <- summarise_inter_method_stability
 run_ablation_analysis <- function (mv, colname_metric, dim_prefix = "mv_dim_", prefixes = character(0),
                                     post_process_importances = NULL,
                                     regression_mv_pre_process = identity,
-                                    regression_post_process = identity) {
+                                    regression_post_process = identity,
+                                    fanova_mv_pre_process = identity,
+                                    fanova_post_process = identity,
+                                    include_fanova_total = TRUE) {
   # Baseline: importances computed on the full multiverse (no fixed decision).
   baseline_importance <- tidy_importance_methods(
     calc_importance_methods(
@@ -304,7 +386,10 @@ run_ablation_analysis <- function (mv, colname_metric, dim_prefix = "mv_dim_", p
       dim_prefix = dim_prefix,
       post_process_importances = post_process_importances,
       regression_mv_pre_process = regression_mv_pre_process,
-      regression_post_process = regression_post_process
+      regression_post_process = regression_post_process,
+      fanova_mv_pre_process = fanova_mv_pre_process,
+      fanova_post_process = fanova_post_process,
+      include_fanova_total = include_fanova_total
     ),
     dim_prefix = dim_prefix
   )
@@ -317,7 +402,10 @@ run_ablation_analysis <- function (mv, colname_metric, dim_prefix = "mv_dim_", p
     prefixes = prefixes,
     post_process_importances = post_process_importances,
     regression_mv_pre_process = regression_mv_pre_process,
-    regression_post_process = regression_post_process
+    regression_post_process = regression_post_process,
+    fanova_mv_pre_process = fanova_mv_pre_process,
+    fanova_post_process = fanova_post_process,
+    include_fanova_total = include_fanova_total
   )
 
   # Add the full-multiverse baseline as a reference pseudo-setting so method

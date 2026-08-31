@@ -14,6 +14,14 @@ calc_fanova <- function (mv, colname_metric, dim_prefix = "mv_dim_", use_individ
     select(starts_with(dim_prefix)) |>
     colnames()
 
+  # Fanova doesn't work with < features. Potentially surface this issue earlier on the R side.
+  if (length(feature_names) < 2) {
+    stop(
+      "calc_fanova() needs at least two varying decisions, got ",
+      length(feature_names), "."
+    )
+  }
+
   X <- mv |> select(all_of(feature_names))
   y <- mv[[colname_metric]]
 
@@ -42,6 +50,26 @@ calc_fanova <- function (mv, colname_metric, dim_prefix = "mv_dim_", use_individ
     rename(any_of(rename_names))
 
   return(importance)
+}
+
+# Total-importance-per-decision vector from a `calc_fanova()` result that was
+# computed with `use_individual = FALSE` (i.e. the full interaction
+# decomposition from `quantify_importance()`). Only the single-decision rows are
+# kept; their `total importance` is the decision's main effect plus every
+# interaction it participates in (comparable to DECIDE').
+fanova_total_to_vec <- function (importance_df) {
+  level_cols <- colnames(importance_df)[startsWith(colnames(importance_df), "level_")]
+  higher_level_cols <- setdiff(level_cols, "level_0")
+
+  singletons <- importance_df
+  if (length(higher_level_cols) > 0) {
+    singletons <- singletons |> filter(if_all(all_of(higher_level_cols), is.na))
+  }
+
+  singletons |>
+    select(decision = level_0, total_importance) |>
+    deframe() |>
+    sort(decreasing = TRUE)
 }
 
 fanova_to_vec <- function (importance_df) {
