@@ -18,7 +18,8 @@ vis_inter_method_stability <- function (inter_method_stability_summary,
                                         baseline_label = "full multiverse",
                                         show_values = TRUE,
                                         add_average = TRUE,
-                                        fill_label = "Mean rank\ncorrelation") {
+                                        fill_label = "Mean rank\ncorrelation",
+                                        fill_option = "viridis") {
   plot_data <- inter_method_stability_summary |>
     mutate(
       comparison = paste(method_x |> nn(), "vs", method_y |> nn()),
@@ -65,7 +66,7 @@ vis_inter_method_stability <- function (inter_method_stability_summary,
     aes(x = comparison, y = fixed_decision_label, fill = mean_rank_correlation)
   ) +
     geom_tile() +
-    scale_fill_viridis_c(limits = c(-1, 1), option = "viridis") +
+    scale_fill_viridis_c(limits = c(-1, 1), option = fill_option) +
     labs(x = NULL, y = NULL, fill = fill_label) +
     theme_classic() +
     theme(axis.text.x = element_text(angle = 45, hjust = 1))
