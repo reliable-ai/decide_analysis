@@ -64,7 +64,7 @@ vis_inter_method_stability <- function (inter_method_stability_summary,
     aes(x = comparison, y = fixed_decision_label, fill = mean_rank_correlation)
   ) +
     geom_tile() +
-    scale_fill_viridis_c(limits = c(-1, 1)) +
+    scale_fill_viridis_c(limits = c(-1, 1), option = "viridis") +
     labs(x = NULL, y = NULL, fill = "Mean rank\ncorrelation") +
     theme_classic() +
     theme(axis.text.x = element_text(angle = 45, hjust = 1))
@@ -119,7 +119,7 @@ vis_intra_method_stability <- function (intra_method_stability_summary,
     )
   ) +
     geom_tile() +
-    scale_fill_viridis_c(limits = c(-1, 1)) +
+    scale_fill_viridis_c(limits = c(-1, 1), option = "mako") +
     labs(x = NULL, y = NULL, fill = "Mean rank\ncorrelation") +
     theme_classic() +
     theme(axis.text.x = element_text(angle = 45, hjust = 1))
