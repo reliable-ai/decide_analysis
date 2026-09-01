@@ -76,9 +76,9 @@ ablation_mtf$inter_method_stability_summary |>
 #| fig-height: 4.5
 vis_inter_method_stability(
   ablation_mtf$inter_method_stability_summary,
-  fill_label = "Mean Pearson\ncorrelation"
-) +
-  theme(legend.position = "none")
+  fill_label = "Mean Pearson\ncorrelation",
+  fill_option = "plasma"
+)
 ```
 
 ### Intra-method stability
@@ -97,6 +97,7 @@ ablation_mtf$intra_method_stability_summary |>
 ```{r mtf-ablation-intra-method-plot}
 vis_intra_method_stability(
   ablation_mtf$intra_method_stability_summary,
-  fill_label = "Mean Pearson\ncorrelation"
+  fill_label = "Mean Pearson\ncorrelation",
+  fill_option = "cividis"
 )
 ```

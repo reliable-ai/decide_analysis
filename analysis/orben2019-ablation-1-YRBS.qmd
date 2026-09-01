@@ -62,9 +62,9 @@ ablation_yrbs$inter_method_stability_summary |>
 #| fig-height: 4.5
 vis_inter_method_stability(
   ablation_yrbs$inter_method_stability_summary,
-  fill_label = "Mean Pearson\ncorrelation"
-) +
-  theme(legend.position = "none")
+  fill_label = "Mean Pearson\ncorrelation",
+  fill_option = "plasma"
+)
 ```
 
 ### Intra-method stability
@@ -83,6 +83,7 @@ ablation_yrbs$intra_method_stability_summary |>
 ```{r yrbs-ablation-intra-method-plot}
 vis_intra_method_stability(
   ablation_yrbs$intra_method_stability_summary,
-  fill_label = "Mean Pearson\ncorrelation"
+  fill_label = "Mean Pearson\ncorrelation",
+  fill_option = "cividis"
 )
 ```

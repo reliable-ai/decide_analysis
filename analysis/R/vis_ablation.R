@@ -84,7 +84,8 @@ vis_inter_method_stability <- function (inter_method_stability_summary,
 vis_intra_method_stability <- function (intra_method_stability_summary,
                                         show_values = TRUE,
                                         add_average = TRUE,
-                                        fill_label = "Mean rank\ncorrelation") {
+                                        fill_label = "Mean rank\ncorrelation",
+                                        fill_option = "mako") {
   plot_data <- intra_method_stability_summary
 
   if (add_average) {
@@ -121,7 +122,7 @@ vis_intra_method_stability <- function (intra_method_stability_summary,
     )
   ) +
     geom_tile() +
-    scale_fill_viridis_c(limits = c(-1, 1), option = "mako") +
+    scale_fill_viridis_c(limits = c(-1, 1), option = fill_option) +
     labs(x = NULL, y = NULL, fill = fill_label) +
     theme_classic() +
     theme(axis.text.x = element_text(angle = 45, hjust = 1))
