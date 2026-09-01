@@ -28,12 +28,12 @@ collapsed back to a single `mv_dim_y_variable` entry.
 This multiverse is ragged: 8 of the 13 `x_variable` choices were only ever run
 with a single `y_variable`, so fixing them leaves `controls` as the only
 varying decision. Those settings are skipped (see `is_usable_ablation()`), as
-an importance vector of length one supports no rank correlation. The
+an importance vector of length one supports no correlation. The
 `n_options` column of the summaries below reports how many choices each
 decision was actually averaged over.
 
 Note also that only three decisions vary here, so every ablated importance
-vector has two entries and the Spearman correlation of a single setting can
+vector has two entries and the Pearson correlation of a single setting can
 only be -1 or +1. `decide_main` and `decide_total` therefore always agree.
 
 TODO: Double check the validity of this multiverse's analysis, manye more things break here than in the others. For practical reasons this one also disables the total.
@@ -46,7 +46,8 @@ ablation_mtf <- run_ablation_analysis(
   regression_post_process = aggregate_onehot_importances,
   fanova_mv_pre_process = expand_y_variable,
   fanova_post_process = aggregate_onehot_importances,
-  include_fanova_total = FALSE
+  include_fanova_total = FALSE,
+  cor_method = "pearson"
 )
 ```
 
@@ -73,7 +74,10 @@ ablation_mtf$inter_method_stability_summary |>
 ```{r mtf-ablation-inter-method-plot}
 #| fig-width: 6
 #| fig-height: 4.5
-vis_inter_method_stability(ablation_mtf$inter_method_stability_summary) +
+vis_inter_method_stability(
+  ablation_mtf$inter_method_stability_summary,
+  fill_label = "Mean Pearson\ncorrelation"
+) +
   theme(legend.position = "none")
 ```
 
@@ -91,5 +95,8 @@ ablation_mtf$intra_method_stability_summary |>
 ```
 
 ```{r mtf-ablation-intra-method-plot}
-vis_intra_method_stability(ablation_mtf$intra_method_stability_summary)
+vis_intra_method_stability(
+  ablation_mtf$intra_method_stability_summary,
+  fill_label = "Mean Pearson\ncorrelation"
+)
 ```

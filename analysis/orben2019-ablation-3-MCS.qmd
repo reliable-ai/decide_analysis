@@ -36,7 +36,8 @@ ablation_mcs <- run_ablation_analysis(
   regression_post_process = aggregate_onehot_importances,
   fanova_mv_pre_process = expand_y_variable,
   fanova_post_process = aggregate_onehot_importances,
-  include_fanova_total = FALSE
+  include_fanova_total = FALSE,
+  cor_method = "pearson"
 )
 ```
 
@@ -63,7 +64,10 @@ ablation_mcs$inter_method_stability_summary |>
 ```{r mcs-ablation-inter-method-plot}
 #| fig-width: 6
 #| fig-height: 4.5
-vis_inter_method_stability(ablation_mcs$inter_method_stability_summary) +
+vis_inter_method_stability(
+  ablation_mcs$inter_method_stability_summary,
+  fill_label = "Mean Pearson\ncorrelation"
+) +
   theme(legend.position = "none")
 ```
 
@@ -81,5 +85,8 @@ ablation_mcs$intra_method_stability_summary |>
 ```
 
 ```{r mcs-ablation-intra-method-plot}
-vis_intra_method_stability(ablation_mcs$intra_method_stability_summary)
+vis_intra_method_stability(
+  ablation_mcs$intra_method_stability_summary,
+  fill_label = "Mean Pearson\ncorrelation"
+)
 ```

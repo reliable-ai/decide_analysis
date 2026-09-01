@@ -17,7 +17,8 @@ add_stability_average_row <- function (stability_summary,
 vis_inter_method_stability <- function (inter_method_stability_summary,
                                         baseline_label = "full multiverse",
                                         show_values = TRUE,
-                                        add_average = TRUE) {
+                                        add_average = TRUE,
+                                        fill_label = "Mean rank\ncorrelation") {
   plot_data <- inter_method_stability_summary |>
     mutate(
       comparison = paste(method_x |> nn(), "vs", method_y |> nn()),
@@ -65,7 +66,7 @@ vis_inter_method_stability <- function (inter_method_stability_summary,
   ) +
     geom_tile() +
     scale_fill_viridis_c(limits = c(-1, 1), option = "viridis") +
-    labs(x = NULL, y = NULL, fill = "Mean rank\ncorrelation") +
+    labs(x = NULL, y = NULL, fill = fill_label) +
     theme_classic() +
     theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
@@ -82,7 +83,8 @@ vis_inter_method_stability <- function (inter_method_stability_summary,
 
 vis_intra_method_stability <- function (intra_method_stability_summary,
                                         show_values = TRUE,
-                                        add_average = TRUE) {
+                                        add_average = TRUE,
+                                        fill_label = "Mean rank\ncorrelation") {
   plot_data <- intra_method_stability_summary
 
   if (add_average) {
@@ -120,7 +122,7 @@ vis_intra_method_stability <- function (intra_method_stability_summary,
   ) +
     geom_tile() +
     scale_fill_viridis_c(limits = c(-1, 1), option = "mako") +
-    labs(x = NULL, y = NULL, fill = "Mean rank\ncorrelation") +
+    labs(x = NULL, y = NULL, fill = fill_label) +
     theme_classic() +
     theme(axis.text.x = element_text(angle = 45, hjust = 1))
 

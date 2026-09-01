@@ -377,7 +377,8 @@ run_ablation_analysis <- function (mv, colname_metric, dim_prefix = "mv_dim_", p
                                     regression_post_process = identity,
                                     fanova_mv_pre_process = identity,
                                     fanova_post_process = identity,
-                                    include_fanova_total = TRUE) {
+                                    include_fanova_total = TRUE,
+                                    cor_method = "spearman") {
   # Baseline: importances computed on the full multiverse (no fixed decision).
   baseline_importance <- tidy_importance_methods(
     calc_importance_methods(
@@ -430,11 +431,12 @@ run_ablation_analysis <- function (mv, colname_metric, dim_prefix = "mv_dim_", p
       ),
     ablation_importance
   ) |>
-    calc_inter_method_stability()
+    calc_inter_method_stability(cor_method = cor_method)
 
   intra_method_stability <- calc_intra_method_stability(
     baseline_importance = baseline_importance,
-    ablation_importance = ablation_importance
+    ablation_importance = ablation_importance,
+    cor_method = cor_method
   )
 
   list(
