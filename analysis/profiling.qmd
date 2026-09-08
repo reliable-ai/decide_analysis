@@ -1,0 +1,256 @@
+---
+title: "Profiling: Method Execution Speed"
+format: pdf
+---
+
+```{r setup}
+source("R/_load.R")
+```
+
+```{r profiling-config}
+# Times each method is run per multiverse; the median is reported, with the
+# min/max shown as a range. Raise for more stable estimates at the cost of a
+# slower render.
+N_RUNS <- 3
+```
+
+## Profiling harness
+
+```{r profiling-harness}
+profile_multiverse <- function (mv, colname_metric,
+                                model_pre_process = identity,
+                                include_fanova_total = TRUE,
+                                n_runs = 3) {
+  model_mv <- model_pre_process(mv)
+
+  runners <- list(
+    regression  = function () calc_regression_importance(model_mv, colname_metric),
+    fanova_main = function () calc_fanova_main_importance(model_mv, colname_metric),
+    decide      = function () calc_decide_importances(mv, colname_metric)
+  )
+
+  if (include_fanova_total) {
+    runners$fanova_total <- function () {
+      calc_fanova_total_importance(model_mv, colname_metric)
+    }
+  }
+
+  imap_dfr(runners, function (run, method) {
+    timings <- vapply(
+      seq_len(n_runs),
+      function (i) unname(system.time(run())[["elapsed"]]),
+      numeric(1)
+    )
+    tibble(
+      method = method,
+      time_median = median(timings),
+      time_min = min(timings),
+      time_max = max(timings),
+      n_runs = n_runs
+    )
+  })
+}
+
+fmt_time <- function (seconds) {
+  if_else(
+    seconds < 1,
+    sprintf("%.0f ms", seconds * 1000),
+    sprintf("%.1f s", seconds)
+  )
+}
+```
+
+## Multiverses
+
+```{r profiling-load-data}
+set.seed(42)
+
+multiverses <- list(
+  "Fertility"        = load_multiverse("fertility"),
+  "Hurricane"        = load_multiverse("hurricane"),
+  "YRBS"       = load_multiverse("orben2019nhb_yrbs"),
+  "MTF"        = load_multiverse("orben2019nhb_mtf"),
+  "MCS"  = load_multiverse("orben2019nhb_mcs_total")
+)
+
+multiverse_levels <- names(multiverses)
+
+specs <- tibble::tribble(
+  ~multiverse,        ~colname_metric,          ~model_pre_process,   ~include_fanova_total,
+  "Fertility",        "fertility_low_estimate", "identity",           TRUE,
+  "Hurricane",        "expected_deaths_diff",   "identity",           TRUE,
+  "YRBS",       "effect",                 "expand_y_variable",  TRUE,
+  "MTF",        "effect",                 "expand_y_variable",  FALSE,
+  "MCS",  "effect",                 "expand_y_variable",  FALSE
+)
+```
+
+```{r profiling-multiverse-overview}
+mv_meta <- specs |>
+  mutate(
+    n_universes = map_int(multiverse, ~ nrow(multiverses[[.x]])),
+    n_decisions = map_int(multiverse, ~ length(get_multiverse_decisions(multiverses[[.x]]))),
+    n_decisions_model = map2_int(
+      multiverse, model_pre_process,
+      ~ length(get_multiverse_decisions(get(.y)(multiverses[[.x]])))
+    )
+  )
+
+mv_meta |>
+  select(multiverse, colname_metric, n_universes, n_decisions,
+         n_decisions_model, include_fanova_total)
+```
+
+## Run profiling
+
+```{r profiling-run}
+#| message: false
+#| warning: false
+profiling_results <- specs |>
+  pmap_dfr(function (multiverse, colname_metric, model_pre_process,
+                     include_fanova_total) {
+    profile_multiverse(
+      multiverses[[multiverse]],
+      colname_metric = colname_metric,
+      model_pre_process = get(model_pre_process),
+      include_fanova_total = include_fanova_total,
+      n_runs = N_RUNS
+    ) |>
+      mutate(multiverse = multiverse, .before = 1)
+  }) |>
+  left_join(mv_meta |> select(multiverse, n_universes, n_decisions), by = "multiverse") |>
+  mutate(
+    multiverse = factor(multiverse, levels = multiverse_levels),
+    method = factor(
+      method,
+      levels = c("regression", "decide", "fanova_main", "fanova_total")
+    ),
+    method_label = factor(nn(as.character(method)), levels = nn(levels(method)))
+  )
+```
+
+## Results
+
+### Timing table (median seconds)
+
+```{r profiling-table-wide}
+profiling_results |>
+  select(multiverse, method_label, time_median) |>
+  pivot_wider(names_from = method_label, values_from = time_median) |>
+  arrange(multiverse)
+```
+
+### Full table
+
+```{r profiling-table-long}
+profiling_results |>
+  arrange(multiverse, desc(time_median)) |>
+  transmute(
+    multiverse,
+    method = method_label,
+    n_universes,
+    median = fmt_time(time_median),
+    range = paste0(fmt_time(time_min), " - ", fmt_time(time_max)),
+    n_runs
+  )
+```
+
+### Execution time by method and multiverse
+
+```{r profiling-bar}
+#| fig-width: 9
+#| fig-height: 6
+ggplot(
+  profiling_results,
+  aes(x = time_median, y = fct_rev(method_label), fill = method)
+) +
+  geom_col() +
+  geom_linerange(aes(xmin = time_min, xmax = time_max)) +
+  geom_text(
+    aes(label = fmt_time(time_median)),
+    hjust = -0.15, size = 2.8
+  ) +
+  facet_wrap(~ multiverse, scales = "free_x") +
+  scale_x_continuous(expand = expansion(mult = c(0, 0.25))) +
+  scale_fill_viridis_d(option = "mako", end = 0.9, guide = "none") +
+  labs(
+    x = "Median execution time (seconds)",
+    y = NULL,
+    title = "Method execution speed across multiverses"
+  )
+```
+
+### Comparison by multiverse
+
+```{r profiling-bar-grouped}
+#| fig-width: 9
+#| fig-height: 5
+ggplot(
+  profiling_results,
+  aes(x = time_median, y = fct_rev(multiverse), fill = method_label)
+) +
+  geom_col(position = position_dodge(width = 0.8), width = 0.75) +
+  scale_x_continuous(expand = expansion(mult = c(0, 0.05))) +
+  scale_fill_viridis_d(option = "mako", end = 0.9) +
+  labs(
+    x = "Median execution time (seconds)",
+    y = NULL,
+    fill = "Method"
+  )
+```
+
+### Heatmap
+
+```{r profiling-heatmap}
+#| fig-width: 7
+#| fig-height: 4.5
+profiling_results |>
+  ggplot(aes(x = method_label, y = fct_rev(multiverse), fill = time_median)) +
+  geom_tile() +
+  geom_text(aes(label = fmt_time(time_median), colour = time_median > 3), size = 3) +
+  scale_fill_viridis_c(
+    option = "rocket", direction = -1, transform = "log10",
+    labels = scales::label_number(drop0trailing = TRUE)
+  ) +
+  scale_colour_manual(values = c(`FALSE` = "black", `TRUE` = "white"), guide = "none") +
+  labs(
+    x = NULL, y = NULL, fill = "Median\ntime (s)",
+    title = "Execution time (log-scaled fill)"
+  ) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+### Scaling with multiverse size
+
+```{r profiling-scaling}
+#| fig-width: 8
+#| fig-height: 5
+ggplot(
+  profiling_results,
+  aes(x = n_universes, y = time_median, colour = method_label, group = method_label)
+) +
+  geom_line() +
+  geom_point(size = 2) +
+  scale_x_log10(labels = scales::label_number(big.mark = ",")) +
+  scale_y_log10(labels = scales::label_number(drop0trailing = TRUE)) +
+  scale_colour_viridis_d(option = "mako", end = 0.9) +
+  labs(
+    x = "Number of universes (log scale)",
+    y = "Median execution time (seconds, log scale)",
+    colour = "Method"
+  )
+```
+
+## Summary
+
+```{r profiling-summary}
+profiling_results |>
+  group_by(method = method_label) |>
+  summarise(
+    min = fmt_time(min(time_median)),
+    median = fmt_time(median(time_median)),
+    max = fmt_time(max(time_median)),
+    .groups = "drop"
+  ) |>
+  arrange(method)
+```
