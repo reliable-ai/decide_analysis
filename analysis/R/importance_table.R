@@ -70,7 +70,7 @@ compose_importance_table <- function (decide,
       "Decision",
       "Total", "Main", "Ratio",
       fanova_names,
-      "Regression"
+      "Reg."
     )
   ) |>
     kableExtra::add_header_above(
