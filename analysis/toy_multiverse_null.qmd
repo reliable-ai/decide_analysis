@@ -111,6 +111,19 @@ vis_importance_2dim(
 )
 ```
 
+## Composite importance table
+
+```{r toy-importance-composite}
+compose_importance_table(
+  decide = decide_toy,
+  fanova_main = calc_fanova_main_importance(mv_toy, colname_metric = "toy_outcome"),
+  fanova_total = fanova_toy |> fanova_total_to_vec(),
+  regression = regimp_toy,
+  caption = "Importance estimates per decision, by method (toy null baseline).",
+  label = "importance-toy"
+)
+```
+
 # Ablation Study (not sure we need this)
 
 ```{r toy-ablation-run}

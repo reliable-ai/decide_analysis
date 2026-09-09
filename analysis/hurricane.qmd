@@ -154,6 +154,19 @@ vis_importance_2dim(
 )
 ```
 
+## Composite importance table
+
+```{r hurricane-importance-composite}
+compose_importance_table(
+  decide = decide_hurr,
+  fanova_main = calc_fanova_main_importance(mv_hurr, colname_metric = "expected_deaths_diff"),
+  fanova_total = fanova_hurr |> fanova_total_to_vec(),
+  regression = regimp_hurr,
+  caption = "Importance estimates per decision, by method (Hurricane).",
+  label = "importance-hurricane"
+)
+```
+
 # Ablation Study
 
 Fix each decision to one option, recompute the importance estimates on the

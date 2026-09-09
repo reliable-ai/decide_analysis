@@ -6,6 +6,7 @@ suppressPackageStartupMessages({
   library(ggraph)
   library(reticulate)
   library(performance)
+  library(kableExtra)
   library(nicknames) # pak::pak("jansim/nicknames")
 })
 

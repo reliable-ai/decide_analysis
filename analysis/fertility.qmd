@@ -152,6 +152,19 @@ vis_importance_2dim(
 )
 ```
 
+## Composite importance table
+
+```{r fertility-importance-composite}
+compose_importance_table(
+  decide = decide_fert,
+  fanova_main = calc_fanova_main_importance(mv_fert, colname_metric = "fertility_low_estimate"),
+  fanova_total = fanova_fert |> fanova_total_to_vec(),
+  regression = regimp_fert,
+  caption = "Importance estimates per decision, by method (Fertility).",
+  label = "importance-fertility"
+)
+```
+
 # Ablation Study
 
 Fix each decision to one option, recompute the importance estimates on the
