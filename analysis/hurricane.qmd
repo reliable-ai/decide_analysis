@@ -33,6 +33,10 @@ reg_hurr <- calc_regression(mv_hurr, colname_metric = "expected_deaths_diff")
 attr(reg_hurr, "tidy")
 ```
 
+```{r hurricane-regression-summary}
+summary(reg_hurr)
+```
+
 ### Performance
 
 ```{r hurricane-regression-performance}

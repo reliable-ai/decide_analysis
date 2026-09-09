@@ -38,6 +38,10 @@ reg_fert <- calc_regression(mv_fert, colname_metric = "fertility_low_estimate")
 attr(reg_fert, "tidy")
 ```
 
+```{r fertility-regression-summary}
+summary(reg_fert)
+```
+
 ### Performance
 
 ```{r fertility-regression-performance}

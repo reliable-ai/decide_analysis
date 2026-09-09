@@ -130,6 +130,10 @@ reg_yrbs <- calc_regression(mv_yrbs_onehot, colname_metric = "effect")
 attr(reg_yrbs, "tidy")
 ```
 
+```{r yrbs-regression-summary}
+summary(reg_yrbs)
+```
+
 #### Performance
 
 ```{r yrbs-regression-performance}
@@ -251,6 +255,10 @@ reg_mtf <- calc_regression(mv_mtf_onehot, colname_metric = "effect")
 attr(reg_mtf, "tidy")
 ```
 
+```{r mtf-regression-summary}
+summary(reg_mtf)
+```
+
 #### Performance
 
 ```{r mtf-regression-performance}
@@ -368,6 +376,10 @@ compose_importance_table(
 ```{r mcs-regression-fit}
 reg_mcs <- calc_regression(mv_mcs_onehot, colname_metric = "effect")
 attr(reg_mcs, "tidy")
+```
+
+```{r mcs-regression-summary}
+summary(reg_mcs)
 ```
 
 #### Performance

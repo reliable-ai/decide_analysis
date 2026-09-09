@@ -58,6 +58,10 @@ reg_toy <- calc_regression(mv_toy, colname_metric = "toy_outcome")
 attr(reg_toy, "tidy")
 ```
 
+```{r toy-regression-summary}
+summary(reg_toy)
+```
+
 ```{r toy-regression-coefficients}
 vis_regression_coefficients(reg_toy)
 ```
