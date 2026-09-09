@@ -52,6 +52,21 @@ calc_fanova <- function (mv, colname_metric, dim_prefix = "mv_dim_", use_individ
   return(importance)
 }
 
+# fANOVA main / individual importance per decision (main effects only, no
+# interactions). This is the cheaper of the two fANOVA quantities.
+calc_fanova_main_importance <- function (mv, colname_metric, dim_prefix = "mv_dim_") {
+  calc_fanova(mv, colname_metric, dim_prefix = dim_prefix, use_individual = TRUE) |>
+    fanova_to_vec()
+}
+
+# fANOVA total importance per decision (main effect plus every interaction the
+# decision is involved in). Requires the full interaction decomposition, which
+# is markedly slower, hence gated behind a flag in the ablation pipeline.
+calc_fanova_total_importance <- function (mv, colname_metric, dim_prefix = "mv_dim_") {
+  calc_fanova(mv, colname_metric, dim_prefix = dim_prefix, use_individual = FALSE) |>
+    fanova_total_to_vec()
+}
+
 # Total-importance-per-decision vector from a `calc_fanova()` result that was
 # computed with `use_individual = FALSE` (i.e. the full interaction
 # decomposition from `quantify_importance()`). Only the single-decision rows are
