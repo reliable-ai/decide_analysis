@@ -309,27 +309,32 @@ def decide(
     ]
     dimension_names = [col[0] for col in dimension_cols]
 
-    perf_col = (performance_metric, "performance_metric")
-
     if max_order is None:
         max_order = len(dimension_names)
 
-    def summarize_groups(cols):
-        # lambda applied within each group formed by `cols`, returning one
-        # summary value per group (indexed by the group's key tuple).
-        return (
-            multiverse_results[perf_col]
-            .groupby([multiverse_results[col] for col in cols])
-            .apply(lambda s: summary(s.to_numpy()))
+    # flatten the MultiIndex columns once up front for speed
+    flat = multiverse_results.copy()
+    flat.columns = [col[0] for col in multiverse_results.columns]
+    perf_values = flat[performance_metric].to_numpy()
+
+    def summarize_groups(names):
+        # lambda applied within each group formed by `names`.
+        # Returns the group each row belongs to alongside one summary value per
+        # group so that callers can index numpy arrays rather than
+        # slice the frame once per group.
+        grouped = flat.groupby(list(names), sort=True)
+        group_ids = grouped.ngroup().to_numpy()
+        group_summaries = np.array(
+            [summary(perf_values[grouped.indices[key]]) for key in sorted(grouped.indices)]
         )
+        return group_ids, group_summaries
 
     # --- main effects: Phi_{s_S}(Lambda_{p_{-S}}(f)) for every subset ---
     main_effect = {}
     for size in range(1, max_order + 1):
         for target_dims in combinations(dimension_names, size):
-            target_dim_cols = [(d, "dimension") for d in target_dims]
-            group_summaries = summarize_groups(target_dim_cols)
-            main_effect[target_dims] = float(spread(group_summaries.to_numpy()))
+            _, group_summaries = summarize_groups(target_dims)
+            main_effect[target_dims] = float(spread(group_summaries))
 
     # --- pure marginal (Sobol) interaction ---
     # interaction_effect(S) = main_effect(S) - sum over proper subsets T of S of
@@ -349,16 +354,12 @@ def decide(
     total_effect = {}
     for size in range(1, max_order + 1):
         for target_dims in combinations(dimension_names, size):
-            target_dim_cols = [(d, "dimension") for d in target_dims]
             other_dims = [d for d in dimension_names if d not in target_dims]
-            other_dim_cols = [(d, "dimension") for d in other_dims]
 
-            if not other_dim_cols:
+            if not other_dims:
                 # target_dims covers every decision: one background context (the
                 # whole dataset), every combination of target_dims is real.
-                total_effect[target_dims] = float(
-                    spread(multiverse_results[perf_col].to_numpy())
-                )
+                total_effect[target_dims] = float(spread(perf_values))
                 continue
 
             # average-case counterfactual for every combination of target_dims'
@@ -367,39 +368,34 @@ def decide(
             # defines the full comparable-set space -- combinations that never
             # occur anywhere are not considered, since there is no data to ground
             # them in.
-            grouped_means = summarize_groups(target_dim_cols)
-            # normalize keys to tuples: groupby collapses a single-column key to
-            # a bare scalar Index rather than a 1-element-tuple MultiIndex, which
-            # would otherwise mismatch the tuple keys built from itertuples below.
-            if len(target_dim_cols) == 1:
-                imputed_means = {(k,): v for k, v in grouped_means.items()}
-            else:
-                imputed_means = grouped_means.to_dict()
-            full_combo_space = list(imputed_means.keys())
+            combo_ids, imputed_means = summarize_groups(target_dims)
+            context_ids = flat.groupby(other_dims, sort=True).ngroup().to_numpy()
+
+            # visit each background context by sorting the rows by context once,
+            # rather than slicing the frame once per context
+            order = np.argsort(context_ids, kind="stable")
+            sorted_ids = context_ids[order]
+            starts = np.flatnonzero(
+                np.concatenate(([True], sorted_ids[1:] != sorted_ids[:-1]))
+            )
+            ends = np.concatenate((starts[1:], [len(order)]))
+            num_contexts = len(starts)
+
+            # a context is missing a combination whenever no row realises that
+            # (context, combination) pair, so count the pairs that do occur
+            num_realized = len(
+                np.unique(context_ids.astype(np.int64) * len(imputed_means) + combo_ids)
+            )
+            num_imputed = num_contexts * len(imputed_means) - num_realized
 
             phi_values = []
-            num_contexts = 0
-            num_imputed = 0
-            for _context, context_rows in multiverse_results.groupby(
-                [multiverse_results[col] for col in other_dim_cols]
-            ):
-                num_contexts += 1
-                real_by_combo = dict(
-                    zip(
-                        context_rows[target_dim_cols].itertuples(
-                            index=False, name=None
-                        ),
-                        context_rows[perf_col],
-                    )
-                )
-                comparable_set = []
-                for combo in full_combo_space:
-                    if combo in real_by_combo:
-                        comparable_set.append(real_by_combo[combo])
-                    else:
-                        comparable_set.append(imputed_means[combo])
-                        num_imputed += 1
-                phi_values.append(spread(np.asarray(comparable_set)))
+            for start, end in zip(starts, ends):
+                rows = order[start:end]
+                # start from the average-case counterfactual everywhere, then
+                # overwrite the combinations this context actually realised
+                comparable_set = imputed_means.copy()
+                comparable_set[combo_ids[rows]] = perf_values[rows]
+                phi_values.append(spread(comparable_set))
 
             if num_imputed > 0:
                 # the multiverse is ragged for this specific subset: at least
