@@ -33,6 +33,10 @@ reg_hurr <- calc_regression(mv_hurr, colname_metric = "expected_deaths_diff")
 attr(reg_hurr, "tidy")
 ```
 
+```{r hurricane-regression-summary}
+summary(reg_hurr)
+```
+
 ### Performance
 
 ```{r hurricane-regression-performance}
@@ -60,8 +64,8 @@ reg_hurr |>
 
 
 ```{r hurricane-regression-residuals-fitted}
-#| fig-height: 5
-#| fig-width: 6
+#| fig-height: 3
+#| fig-width: 4.5
 vis_residuals_vs_fitted(reg_hurr)
 ```
 
@@ -81,8 +85,8 @@ vis_observed_vs_predicted(reg_hurr, type = "hist") +
 
 
 ```{r hurricane-regression-observed-predicted-hist}
-#| fig-height: 5
-#| fig-width: 10
+#| fig-height: 4
+#| fig-width: 12
 vis_observed_vs_predicted(reg_hurr, type = "hist", facet = T) +
   labs(x = nn("expected_deaths_diff"))
 ```
@@ -151,6 +155,19 @@ decide_vec(mv_hurr, colname_metric = "expected_deaths_diff") |>
 vis_importance_2dim(
   decide_vec(mv_hurr, colname_metric = "expected_deaths_diff"),
   fanova_hurr |> fanova_to_vec()
+)
+```
+
+## Composite importance table
+
+```{r hurricane-importance-composite}
+compose_importance_table(
+  decide = decide_hurr,
+  fanova_main = calc_fanova_main_importance(mv_hurr, colname_metric = "expected_deaths_diff"),
+  fanova_total = fanova_hurr |> fanova_total_to_vec(),
+  regression = regimp_hurr,
+  caption = "Importance estimates per decision, by method (Hurricane).",
+  label = "importance-hurricane"
 )
 ```
 

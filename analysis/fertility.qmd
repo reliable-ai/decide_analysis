@@ -38,6 +38,10 @@ reg_fert <- calc_regression(mv_fert, colname_metric = "fertility_low_estimate")
 attr(reg_fert, "tidy")
 ```
 
+```{r fertility-regression-summary}
+summary(reg_fert)
+```
+
 ### Performance
 
 ```{r fertility-regression-performance}
@@ -63,8 +67,8 @@ reg_fert |>
 ```
 
 ```{r fertility-regression-residuals-fitted}
-#| fig-height: 5
-#| fig-width: 6
+#| fig-height: 3
+#| fig-width: 4.5
 vis_residuals_vs_fitted(reg_fert)
 ```
 
@@ -83,8 +87,8 @@ vis_observed_vs_predicted(reg_fert, type = "hist") +
 ```
 
 ```{r fertility-regression-observed-predicted-hist}
-#| fig-height: 5
-#| fig-width: 10
+#| fig-height: 4
+#| fig-width: 12
 vis_observed_vs_predicted(reg_fert, type = "hist", facet = T) +
   labs(x = nn("fertility_low_estimate"))
 ```
@@ -149,6 +153,19 @@ decide_vec(mv_fert, colname_metric = "fertility_low_estimate") |>
 vis_importance_2dim(
   decide_vec(mv_fert, colname_metric = "fertility_low_estimate"),
   fanova_fert |> fanova_to_vec()
+)
+```
+
+## Composite importance table
+
+```{r fertility-importance-composite}
+compose_importance_table(
+  decide = decide_fert,
+  fanova_main = calc_fanova_main_importance(mv_fert, colname_metric = "fertility_low_estimate"),
+  fanova_total = fanova_fert |> fanova_total_to_vec(),
+  regression = regimp_fert,
+  caption = "Importance estimates per decision, by method (Fertility).",
+  label = "importance-fertility"
 )
 ```
 

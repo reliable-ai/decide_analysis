@@ -58,6 +58,10 @@ reg_toy <- calc_regression(mv_toy, colname_metric = "toy_outcome")
 attr(reg_toy, "tidy")
 ```
 
+```{r toy-regression-summary}
+summary(reg_toy)
+```
+
 ```{r toy-regression-coefficients}
 vis_regression_coefficients(reg_toy)
 ```
@@ -108,6 +112,19 @@ decide_vec(mv_toy, colname_metric = "toy_outcome") |>
 vis_importance_2dim(
   decide_vec(mv_toy, colname_metric = "toy_outcome"),
   fanova_toy |> filter(is.na(level_1)) |> fanova_to_vec()
+)
+```
+
+## Composite importance table
+
+```{r toy-importance-composite}
+compose_importance_table(
+  decide = decide_toy,
+  fanova_main = calc_fanova_main_importance(mv_toy, colname_metric = "toy_outcome"),
+  fanova_total = fanova_toy |> fanova_total_to_vec(),
+  regression = regimp_toy,
+  caption = "Importance estimates per decision, by method (toy null baseline).",
+  label = "importance-toy"
 )
 ```
 

@@ -130,6 +130,10 @@ reg_yrbs <- calc_regression(mv_yrbs_onehot, colname_metric = "effect")
 attr(reg_yrbs, "tidy")
 ```
 
+```{r yrbs-regression-summary}
+summary(reg_yrbs)
+```
+
 #### Performance
 
 ```{r yrbs-regression-performance}
@@ -226,6 +230,18 @@ vis_importance_2dim(
 )
 ```
 
+### Composite importance table
+
+```{r yrbs-importance-composite}
+compose_importance_table(
+  decide = decide_yrbs,
+  fanova_main = calc_fanova_main_importance(mv_yrbs_onehot, colname_metric = "effect") |> aggregate_onehot_importances(),
+  regression = regimp_yrbs,
+  caption = "Importance estimates per decision, by method (Orben 2019, YRBS).",
+  label = "importance-yrbs"
+)
+```
+
 ---
 
 # MTF
@@ -237,6 +253,10 @@ vis_importance_2dim(
 ```{r mtf-regression-fit}
 reg_mtf <- calc_regression(mv_mtf_onehot, colname_metric = "effect")
 attr(reg_mtf, "tidy")
+```
+
+```{r mtf-regression-summary}
+summary(reg_mtf)
 ```
 
 #### Performance
@@ -333,6 +353,18 @@ vis_importance_2dim(
 )
 ```
 
+### Composite importance table
+
+```{r mtf-importance-composite}
+compose_importance_table(
+  decide = decide_mtf,
+  fanova_main = calc_fanova_main_importance(mv_mtf_onehot, colname_metric = "effect") |> aggregate_onehot_importances(),
+  regression = regimp_mtf,
+  caption = "Importance estimates per decision, by method (Orben 2019, MTF).",
+  label = "importance-mtf"
+)
+```
+
 ---
 
 # MCS Total
@@ -344,6 +376,10 @@ vis_importance_2dim(
 ```{r mcs-regression-fit}
 reg_mcs <- calc_regression(mv_mcs_onehot, colname_metric = "effect")
 attr(reg_mcs, "tidy")
+```
+
+```{r mcs-regression-summary}
+summary(reg_mcs)
 ```
 
 #### Performance
@@ -439,5 +475,17 @@ vis_importance(decide_vec_mcs)
 vis_importance_2dim(
   decide_vec_mcs,
   fanova_mcs |> fanova_to_vec() |> aggregate_onehot_importances()
+)
+```
+
+### Composite importance table
+
+```{r mcs-importance-composite}
+compose_importance_table(
+  decide = decide_mcs,
+  fanova_main = calc_fanova_main_importance(mv_mcs_onehot, colname_metric = "effect") |> aggregate_onehot_importances(),
+  regression = regimp_mcs,
+  caption = "Importance estimates per decision, by method (Orben 2019, MCS Total).",
+  label = "importance-mcs"
 )
 ```
