@@ -140,6 +140,59 @@ profiling_results |>
   arrange(multiverse)
 ```
 
+### Clean table
+
+```{r profiling-table}
+#| echo: false
+profiling_latex <- profiling_results |>
+  transmute(
+    multiverse,
+    method_label,
+    n_universes,
+    cell = fmt_time(time_median)
+  ) |>
+  pivot_wider(
+    names_from = method_label, values_from = cell,
+    names_sort = TRUE
+  ) |>
+  arrange(multiverse) |>
+  mutate(
+    n_universes = scales::label_comma(accuracy = 1)(n_universes),
+    across(where(is.character), ~ replace_na(.x, "--"))
+  ) |>
+  select(multiverse, n_universes,
+         Regression, DECIDE, `fANOVA (main)`, `fANOVA (total)`)
+
+profiling_kbl <- knitr::kable(
+  profiling_latex,
+  format = "latex",
+  booktabs = TRUE,
+  escape = TRUE,
+  linesep = "",
+  align = c("l", "r", "r", "r", "r", "r"),
+  caption = paste0(
+    "Median execution time per method and multiverse, over ", N_RUNS,
+    " runs. Dashes mark methods not evaluated for a given multiverse."
+  ),
+  label = "profiling-timings",
+  col.names = c("Multiverse", "Universes", "Regression", "DECIDE", "Main", "Total")
+) |>
+  kableExtra::add_header_above(
+    c(" " = 4, "fANOVA" = 2)
+  )
+
+# Also write the table to the tables dir, mirroring compose_importance_table().
+local({
+  tables_dir <- here::here("tables")
+  if (!dir.exists(tables_dir)) dir.create(tables_dir, recursive = TRUE)
+  tex_path <- file.path(tables_dir, "profiling-timings.tex")
+  writeLines(as.character(profiling_kbl), tex_path)
+  message("Wrote ", tex_path)
+})
+
+profiling_kbl
+```
+
 ### Full table
 
 ```{r profiling-table-long}
