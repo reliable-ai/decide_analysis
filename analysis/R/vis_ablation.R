@@ -70,6 +70,11 @@ vis_inter_method_stability <- function (inter_method_stability_summary,
         is.na(mean_rank_correlation),
         "NA",
         formatC(mean_rank_correlation, digits = 2, format = "f")
+      ),
+      label_color = if_else(
+        !is.na(mean_rank_correlation) & mean_rank_correlation < -0.5,
+        "white",
+        "black"
       )
     )
 
@@ -84,7 +89,8 @@ vis_inter_method_stability <- function (inter_method_stability_summary,
     theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
   if (show_values) {
-    plot <- plot + geom_text(aes(label = correlation_label), size = 3)
+    plot <- plot + geom_text(aes(label = correlation_label, color = label_color), size = 3) +
+      scale_color_identity()
   }
 
   if (add_average) {
@@ -125,6 +131,11 @@ vis_intra_method_stability <- function (intra_method_stability_summary,
         is.na(mean_rank_correlation),
         "NA",
         formatC(mean_rank_correlation, digits = 2, format = "f")
+      ),
+      label_color = if_else(
+        !is.na(mean_rank_correlation) & mean_rank_correlation < -0.5,
+        "white",
+        "black"
       )
     )
 
@@ -143,7 +154,8 @@ vis_intra_method_stability <- function (intra_method_stability_summary,
     theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
   if (show_values) {
-    plot <- plot + geom_text(aes(label = correlation_label), size = 3)
+    plot <- plot + geom_text(aes(label = correlation_label, color = label_color), size = 3) +
+      scale_color_identity()
   }
 
   if (add_average) {
