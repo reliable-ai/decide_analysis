@@ -61,6 +61,8 @@ compose_importance_table <- function (decide,
     format = "latex",
     booktabs = TRUE,
     digits = digits,
+    # keep small values in fixed notation (e.g. 0.00005, not 5e-05)
+    format.args = list(scientific = FALSE, nsmall = digits),
     escape = TRUE,
     linesep = "",
     align = c("l", rep("r", 4 + n_fanova)),

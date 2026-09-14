@@ -238,7 +238,8 @@ compose_importance_table(
   fanova_main = calc_fanova_main_importance(mv_yrbs_onehot, colname_metric = "effect") |> aggregate_onehot_importances(),
   regression = regimp_yrbs,
   caption = "Importance estimates per decision, by method (Orben 2019, YRBS).",
-  label = "importance-yrbs"
+  label = "importance-yrbs",
+  digits = 5
 )
 ```
 
@@ -361,7 +362,8 @@ compose_importance_table(
   fanova_main = calc_fanova_main_importance(mv_mtf_onehot, colname_metric = "effect") |> aggregate_onehot_importances(),
   regression = regimp_mtf,
   caption = "Importance estimates per decision, by method (Orben 2019, MTF).",
-  label = "importance-mtf"
+  label = "importance-mtf",
+  digits = 5
 )
 ```
 
@@ -486,6 +488,7 @@ compose_importance_table(
   fanova_main = calc_fanova_main_importance(mv_mcs_onehot, colname_metric = "effect") |> aggregate_onehot_importances(),
   regression = regimp_mcs,
   caption = "Importance estimates per decision, by method (Orben 2019, MCS Total).",
-  label = "importance-mcs"
+  label = "importance-mcs",
+  digits = 5
 )
 ```
