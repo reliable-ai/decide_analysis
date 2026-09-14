@@ -22,13 +22,24 @@ vis_inter_method_stability <- function (inter_method_stability_summary,
                                         fill_option = "viridis") {
   plot_data <- inter_method_stability_summary |>
     mutate(
-      comparison = paste(method_x |> nn(), "vs", method_y |> nn()),
+      # order the two methods within each pair canonically, so that e.g.
+      # DECIDE always precedes fANOVA in the comparison label
+      swap_methods = method_rank(method_x) > method_rank(method_y),
+      method_first = if_else(swap_methods, method_y, method_x),
+      method_second = if_else(swap_methods, method_x, method_y),
+      comparison = paste(method_first |> nn(), "vs", method_second |> nn()),
       fixed_decision_label = if_else(
         fixed_decision == "full_multiverse",
         baseline_label,
         fixed_decision_label
       )
     )
+
+  # comparisons on the x-axis follow the canonical method order
+  comparison_order <- plot_data |>
+    distinct(method_first, method_second, comparison) |>
+    arrange(method_rank(method_first), method_rank(method_second)) |>
+    pull(comparison)
 
   if (add_average) {
     plot_data <- add_stability_average_row(plot_data, group_cols = "comparison")
@@ -53,6 +64,7 @@ vis_inter_method_stability <- function (inter_method_stability_summary,
 
   plot_data <- plot_data |>
     mutate(
+      comparison = factor(comparison, levels = unique(comparison_order)),
       fixed_decision_label = factor(fixed_decision_label, levels = unique(decision_order)),
       correlation_label = if_else(
         is.na(mean_rank_correlation),
@@ -106,6 +118,8 @@ vis_intra_method_stability <- function (intra_method_stability_summary,
 
   plot_data <- plot_data |>
     mutate(
+      # methods on the x-axis follow the canonical method order
+      method_label = factor_method_labels(method),
       fixed_decision_label = factor(fixed_decision_label, levels = unique(decision_order)),
       correlation_label = if_else(
         is.na(mean_rank_correlation),
@@ -117,7 +131,7 @@ vis_intra_method_stability <- function (intra_method_stability_summary,
   plot <- ggplot(
     plot_data,
     aes(
-      x = method |> nn(),
+      x = method_label,
       y = fixed_decision_label,
       fill = mean_rank_correlation
     )
