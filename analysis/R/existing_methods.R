@@ -7,7 +7,8 @@ remove_fake_decisions <- function (mv, dim_prefix = "mv_dim_") {
   mv |> select(-all_of(fake))
 }
 
-calc_fanova <- function (mv, colname_metric, dim_prefix = "mv_dim_", use_individual = FALSE) {
+calc_fanova <- function (mv, colname_metric, dim_prefix = "mv_dim_", use_individual = FALSE,
+                         seed = 42) {
   use_virtualenv("../.venv/")
 
   feature_names <- mv |>
@@ -34,7 +35,11 @@ calc_fanova <- function (mv, colname_metric, dim_prefix = "mv_dim_", use_individ
 
   result_csv <- tempfile(fileext = ".csv")
 
-  mv_fav <- mv_fanova_mod$MultiverseFanova(features = X_pd, outcome = y_pd)
+  mv_fav <- mv_fanova_mod$MultiverseFanova(
+    features = X_pd,
+    outcome = y_pd,
+    seed = if (is.null(seed)) NULL else as.integer(seed)
+  )
   if (use_individual) {
     result_pd <- mv_fav$quantify_individual_importance(save_to = result_csv)
   } else {
@@ -54,16 +59,16 @@ calc_fanova <- function (mv, colname_metric, dim_prefix = "mv_dim_", use_individ
 
 # fANOVA main / individual importance per decision (main effects only, no
 # interactions). This is the cheaper of the two fANOVA quantities.
-calc_fanova_main_importance <- function (mv, colname_metric, dim_prefix = "mv_dim_") {
-  calc_fanova(mv, colname_metric, dim_prefix = dim_prefix, use_individual = TRUE) |>
+calc_fanova_main_importance <- function (mv, colname_metric, dim_prefix = "mv_dim_", seed = 42) {
+  calc_fanova(mv, colname_metric, dim_prefix = dim_prefix, use_individual = TRUE, seed = seed) |>
     fanova_to_vec()
 }
 
 # fANOVA total importance per decision (main effect plus every interaction the
 # decision is involved in). Requires the full interaction decomposition, which
 # is markedly slower, hence gated behind a flag in the ablation pipeline.
-calc_fanova_total_importance <- function (mv, colname_metric, dim_prefix = "mv_dim_") {
-  calc_fanova(mv, colname_metric, dim_prefix = dim_prefix, use_individual = FALSE) |>
+calc_fanova_total_importance <- function (mv, colname_metric, dim_prefix = "mv_dim_", seed = 42) {
+  calc_fanova(mv, colname_metric, dim_prefix = dim_prefix, use_individual = FALSE, seed = seed) |>
     fanova_total_to_vec()
 }
 
