@@ -332,9 +332,14 @@ def decide(
 
     Returns:
         dict: mapping each non-empty tuple of judgment call names (up to
-            max_order) to a dict with keys "var_total", "main_effect", and
+            max_order) to a dict with keys "main_effect" and
             "total_effect", plus "interaction_effect" for subsets with
             |S| >= 2 (omitted for singletons -- see interaction_effect above).
+            Only relevant for sparse multiverses, each judgement call's dict
+            also has a key for "applicability_share": the share of background
+            contexts (weighted as in context_weight) that realize at least two
+            choices of S and thus are included in the calculation of
+            total_effect. total_effect is NaN when this share is 0.
     """
     dimension_cols = [
         col for col in multiverse_results.columns if col[1] == "dimension"
@@ -392,6 +397,7 @@ def decide(
 
     # --- total effects: total effect of every subset ---
     total_effect = {}
+    applicability_share = {}
     for size in range(1, max_order + 1):
         for target_dims in combinations(dimension_names, size):
             other_dims = [d for d in dimension_names if d not in target_dims]
@@ -400,6 +406,7 @@ def decide(
                 # target_dims covers every decision: one background context (the
                 # whole dataset), every combination of target_dims is real.
                 total_effect[target_dims] = float(spread(perf_values))
+                applicability_share[target_dims] = 1.0
                 continue
 
             context_ids = flat.groupby(other_dims, sort=True).ngroup().to_numpy()
@@ -423,13 +430,39 @@ def decide(
                 phi_values.append(spread(perf_values[rows]))
                 num_realized.append(len(rows))
 
+            phi_values = np.asarray(phi_values)
+            num_realized = np.asarray(num_realized)
+
+            # a background realizing only one choice of target_dims (r_i(b) < 2)
+            # offers no comparison, so it is left out. the applicability share
+            # records how much of the multiverse remains, weighted the same way
+            # as the score below, so that with Lambda = mean: unconditional
+            # score = share * conditional score
+            comparable = num_realized >= 2
+            weights = num_realized if context_weight == "universe" else np.ones_like(num_realized)
+            applicability_share[target_dims] = float(weights[comparable].sum() / weights.sum())
+
+            if not comparable.any():
+                # no context lets target_dims vary on its own, so its total
+                # effect cannot be estimated; refuse rather than guess
+                warnings.warn(
+                    f"total_effect for {target_dims} is not estimable: no "
+                    f"background context realizes more than one of its "
+                    f"choices, so it is reported as NaN (see "
+                    f"SPARSITY_TAXONOMY.md).",
+                    stacklevel=2,
+                )
+                total_effect[target_dims] = np.nan
+                continue
+
             # aggregate the per-context spreads with Lambda. with "universe"
             # weighting, each context's spread is repeated r_i(b) times so that
             # every universe counts once; with "context" weighting, every
             # context counts once
+            phi_values = phi_values[comparable]
             if context_weight == "universe":
-                phi_values = np.repeat(phi_values, num_realized)
-            total_effect[target_dims] = float(summary(np.asarray(phi_values)))
+                phi_values = np.repeat(phi_values, num_realized[comparable])
+            total_effect[target_dims] = float(summary(phi_values))
 
     # --- assemble per-subset results ---
     decomposition = {}
@@ -437,6 +470,7 @@ def decide(
         entry = {
             "total_effect": total_effect[target_dims],
             "main_effect": effect_value,
+            "applicability_share": applicability_share[target_dims],
         }
         # interaction_effect(S) == main_effect(S) for |S| == 1 by construction
         # (see the recursion above), so it's only reported for |S| >= 2 to
