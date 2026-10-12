@@ -14,18 +14,17 @@ This measure can be thought of as "between-bucket" variation.
 """
 
 # imports
-import pandas as pd
-import numpy as np
 import warnings
-from copy import deepcopy
 from collections import defaultdict
+from copy import deepcopy
 from itertools import combinations
+
+import numpy as np
+import pandas as pd
 
 
 def organize_multiverse_results(
-    multiverse_results: pd.DataFrame,
-    dimension_order: list,
-    performance_metrics: list
+    multiverse_results: pd.DataFrame, dimension_order: list, performance_metrics: list
 ) -> pd.DataFrame:
     """
     The multiverse results come as a DataFrame with columns for each judgment
@@ -54,7 +53,7 @@ def organize_multiverse_results(
     # the column corresponding to the choice made for decision j. We will give
     # the user a warning in case they were not familiar that this was happening
     # in their multiverse.
-    dimension_order = list(dimension_order) # avoid mutating the input
+    dimension_order = list(dimension_order)  # avoid mutating the input
     for j in list(dimension_order):
         if multiverse_results[j].nunique() < 2:
             raise ValueError(
@@ -71,7 +70,7 @@ def organize_multiverse_results(
                 )
                 multiverse_results = multiverse_results.drop(columns=j)
                 dimension_order.remove(j)
-                break # since j is removed, stop searching over it
+                break  # since j is removed, stop searching over it
 
     # give each column a certain level using multilevel indexing to denote
     # if it is a dimension (judgment call) or a performance metric
@@ -88,9 +87,7 @@ def organize_multiverse_results(
 
 
 def spread_in_path(
-    multiverse_results: pd.DataFrame,
-    decision_path: dict,
-    performance_metric: str
+    multiverse_results: pd.DataFrame, decision_path: dict, performance_metric: str
 ) -> pd.DataFrame:
     """
     Calculates the within-bucket variation for a particular decision path.
@@ -199,9 +196,8 @@ def naive_tree_based_importance(
             # (42, "random_forest").
             path_tuple = []
             for dimension in multiverse_results.columns.get_level_values(0):
-                if (dimension, "dimension") in multiverse_results.columns:
-                    if dimension in path:
-                        path_tuple.append(path[dimension])
+                if (dimension, "dimension") in multiverse_results.columns and dimension in path:
+                    path_tuple.append(path[dimension])
             path_tuple = tuple(path_tuple)
             paths_with_var[path_tuple] = spread_in_path(
                 multiverse_results, path, performance_metric
@@ -229,7 +225,7 @@ def naive_tree_based_importance(
             # judgment call)
             paths_one_decision_away = [
                 p
-                for p in var_by_depth.get(depth + 1, {}).keys()
+                for p in var_by_depth.get(depth + 1, {})
                 if p[:depth] == path_tuple
             ]
             # print(f"At depth {depth}, for path {path_tuple} with variance \
@@ -350,8 +346,7 @@ def decide(
 
     if context_weight not in ("universe", "context"):
         raise ValueError(
-            f"`context_weight` must be 'universe' or 'context', got "
-            f"'{context_weight}'."
+            f"`context_weight` must be 'universe' or 'context', got '{context_weight}'."
         )
 
     # flatten the MultiIndex columns once up front for speed
@@ -367,7 +362,10 @@ def decide(
         grouped = flat.groupby(list(names), sort=True)
         group_ids = grouped.ngroup().to_numpy()
         group_summaries = np.array(
-            [summary(perf_values[grouped.indices[key]]) for key in sorted(grouped.indices)]
+            [
+                summary(perf_values[grouped.indices[key]])
+                for key in sorted(grouped.indices)
+            ]
         )
         return group_ids, group_summaries
 
@@ -387,7 +385,7 @@ def decide(
         for target_dims in combinations(dimension_names, size):
             lower = sum(
                 interaction_effect[sub]
-                for r in range(1, size) # no-op if size=1, so nothing happens
+                for r in range(1, size)  # no-op if size=1, so nothing happens
                 for sub in combinations(target_dims, r)
             )
             interaction_effect[target_dims] = main_effect[target_dims] - lower
@@ -435,10 +433,10 @@ def decide(
 
     # --- assemble per-subset results ---
     decomposition = {}
-    for target_dims in main_effect:
+    for target_dims, effect_value in main_effect.items():
         entry = {
             "total_effect": total_effect[target_dims],
-            "main_effect": main_effect[target_dims],
+            "main_effect": effect_value,
         }
         # interaction_effect(S) == main_effect(S) for |S| == 1 by construction
         # (see the recursion above), so it's only reported for |S| >= 2 to
