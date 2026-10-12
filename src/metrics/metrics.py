@@ -263,6 +263,7 @@ def decide(
     spread=np.var,
     summary=np.mean,
     context_weight: str = "universe",
+    exclude_inert: bool = False,
 ) -> dict:
     """
     Single entry point for the DECIDE decomposition of a multiverse.
@@ -329,6 +330,14 @@ def decide(
             that each universe counts once, while "context" weights every
             background equally, so that another decision adding extra options in
             another branch cannot upweight those importances.
+        exclude_inert (bool, optional): A background context is "inert" for S
+            when we observe at least two choices of S but they each give
+            identical outcomes, e.g. because S does not apply there (or is a
+            no-op). Identical outcomes can also arise by coincidence when S does
+            apply (e.g. with discrete outcomes), so by default (False) inert
+            contexts are kept as true zeros and only reported through
+            "inert_share". Set to True to leave them out of total_effect, i.e.
+            to score S only where it applies.
 
     Returns:
         dict: mapping each non-empty tuple of judgment call names (up to
@@ -339,7 +348,9 @@ def decide(
             also has a key for "applicability_share": the share of background
             contexts (weighted as in context_weight) that realize at least two
             choices of S and thus are included in the calculation of
-            total_effect. total_effect is NaN when this share is 0.
+            total_effect. total_effect is NaN when this share is 0. Each dict
+            also has "inert_share": the share of background contexts (weighted
+            the same way) that are inert for S (see exclude_inert).
     """
     dimension_cols = [
         col for col in multiverse_results.columns if col[1] == "dimension"
@@ -398,6 +409,7 @@ def decide(
     # --- total effects: total effect of every subset ---
     total_effect = {}
     applicability_share = {}
+    inert_share = {}
     for size in range(1, max_order + 1):
         for target_dims in combinations(dimension_names, size):
             other_dims = [d for d in dimension_names if d not in target_dims]
@@ -407,6 +419,7 @@ def decide(
                 # whole dataset), every combination of target_dims is real.
                 total_effect[target_dims] = float(spread(perf_values))
                 applicability_share[target_dims] = 1.0
+                inert_share[target_dims] = float(np.all(perf_values == perf_values[0]))
                 continue
 
             context_ids = flat.groupby(other_dims, sort=True).ngroup().to_numpy()
@@ -424,11 +437,13 @@ def decide(
             # actually exist there; imputing causes leakage so we do not impute,
             # thus contexts may compare different numbers of choices
             phi_values = []
-            num_realized = []  # r_i(b): number of choices compared in context b
+            num_realized = []  # r_i(b): number of choices compared in context b_i
+            all_identical = []  # whether every outcome in context b_i is the same
             for start, end in zip(starts, ends):
                 rows = order[start:end]
                 phi_values.append(spread(perf_values[rows]))
                 num_realized.append(len(rows))
+                all_identical.append(np.all(perf_values[rows] == perf_values[rows[0]]))
 
             phi_values = np.asarray(phi_values)
             num_realized = np.asarray(num_realized)
@@ -440,6 +455,16 @@ def decide(
             # score = share * conditional score
             comparable = num_realized >= 2
             weights = num_realized if context_weight == "universe" else np.ones_like(num_realized)
+
+            # an inert context compares several choices of target_dims that all
+            # give the same outcome, e.g. because target_dims does not apply
+            # there. this can also happen by coincidence, so inert contexts are
+            # only reported by default, and left out only if asked
+            inert = comparable & np.asarray(all_identical)
+            inert_share[target_dims] = float(weights[inert].sum() / weights.sum())
+            if exclude_inert:
+                comparable &= ~inert
+
             applicability_share[target_dims] = float(weights[comparable].sum() / weights.sum())
 
             if not comparable.any():
@@ -447,9 +472,9 @@ def decide(
                 # effect cannot be estimated; refuse rather than guess
                 warnings.warn(
                     f"total_effect for {target_dims} is not estimable: no "
-                    f"background context realizes more than one of its "
-                    f"choices, so it is reported as NaN (see "
-                    f"SPARSITY_TAXONOMY.md).",
+                    f"background context offers a usable comparison of its "
+                    f"choices (each realizes only one choice, or is inert and "
+                    f"exclude_inert=True), so it is reported as NaN.",
                     stacklevel=2,
                 )
                 total_effect[target_dims] = np.nan
@@ -471,6 +496,7 @@ def decide(
             "total_effect": total_effect[target_dims],
             "main_effect": effect_value,
             "applicability_share": applicability_share[target_dims],
+            "inert_share": inert_share[target_dims],
         }
         # interaction_effect(S) == main_effect(S) for |S| == 1 by construction
         # (see the recursion above), so it's only reported for |S| >= 2 to
