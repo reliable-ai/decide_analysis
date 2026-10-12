@@ -46,6 +46,28 @@ def organize_multiverse_results(
     # get the subset of the results that apply for our analysis
     multiverse_results = multiverse_results[dimension_order + performance_metrics]
 
+    # if the input is incorrectly formatted or has some sort of sparsity that
+    # makes it impossible to accurately estimate, then we want to throw an error
+    # instead of returning bad importances.
+    missing_choices = multiverse_results[dimension_order].isna().any()
+    if missing_choices.any():
+        raise ValueError(
+            f"Judgment call(s) {list(missing_choices[missing_choices].index)} "
+            f"contain NA values; encode them as an explicit option instead."
+        )
+    metric_values = multiverse_results[performance_metrics].to_numpy(dtype=float)
+    if not np.isfinite(metric_values).all():
+        raise ValueError(
+            "Performance metric(s) contain NA or infinite values (e.g. failed "
+            "runs); drop those universes first."
+        )
+    num_duplicates = multiverse_results.duplicated(subset=dimension_order).sum()
+    if num_duplicates > 0:
+        raise ValueError(
+            f"{num_duplicates} universe(s) appear more than once (same choices "
+            f"for every judgment call); aggregate them first (e.g. over seeds)."
+        )
+
     # if the multiverse is such that the option (singular) available at the jth
     # decision is a deterministic function of the choice made at the ith
     # decision, this means that the ith decision never varies on its own, so its
