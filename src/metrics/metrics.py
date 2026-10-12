@@ -288,6 +288,7 @@ def decide(
     max_order: int = 1,
     spread=np.var,
     summary=np.mean,
+    exclude_inert: bool = False,
 ) -> dict:
     """
     Single entry point for the DECIDE decomposition of a multiverse.
@@ -346,12 +347,27 @@ def decide(
             (population variance, ddof=0).
         summary (callable, optional): Summary function Lambda mapping a 1-D numpy
             array of outcomes to an aggregate value. Defaults to np.mean.
+        exclude_inert (bool, optional): Some decisions do not apply in certain
+            backgrounds but are still listed there, so all of their options
+            give identical results (e.g. in YRBS, combination when y_variable
+            is a singleton). Identical results can also happen by coincidence
+            when the decision does apply (e.g. with discrete outcomes), so by
+            default (False) these backgrounds are kept as zeros and only
+            reported through "inert_share". Set to True to calculate the
+            importance only over the backgrounds where the decision applies.
 
     Returns:
         dict: mapping each non-empty tuple of judgment call names (up to
-            max_order) to a dict with keys "var_total", "main_effect", and
+            max_order) to a dict with keys "main_effect" and
             "total_effect", plus "interaction_effect" for subsets with
             |S| >= 2 (omitted for singletons -- see interaction_effect above).
+            Only relevant for sparse multiverses, each judgment call's dict also
+            has "applicability_share", the proportion of backgrounds included in
+            total_effect, and "inert_share", the proportion of backgrounds where
+            all options give identical results (see exclude_inert). With
+            Lambda = mean and exclude_inert=True, total_effect *
+            applicability_share equals the total_effect obtained with
+            exclude_inert=False.
     """
     dimension_cols = [
         col for col in multiverse_results.columns if col[1] == "dimension"
@@ -399,8 +415,10 @@ def decide(
             )
             interaction_effect[target_dims] = main_effect[target_dims] - lower
 
-    # --- total effects: ragged-tree safe total effect of every subset ---
+    # --- total effects: total effect of every subset ---
     total_effect = {}
+    applicability_share = {}
+    inert_share = {}
     for size in range(1, max_order + 1):
         for target_dims in combinations(dimension_names, size):
             other_dims = [d for d in dimension_names if d not in target_dims]
@@ -409,6 +427,8 @@ def decide(
                 # target_dims covers every decision: one background context (the
                 # whole dataset), every combination of target_dims is real.
                 total_effect[target_dims] = float(spread(perf_values))
+                applicability_share[target_dims] = 1.0
+                inert_share[target_dims] = float(np.all(perf_values == perf_values[0]))
                 continue
 
             # average-case counterfactual for every combination of target_dims'
@@ -438,6 +458,7 @@ def decide(
             num_imputed = num_contexts * len(imputed_means) - num_realized
 
             phi_values = []
+            is_inert = []  # whether target_dims is a no-op in each background
             for start, end in zip(starts, ends):
                 rows = order[start:end]
                 # start from the average-case counterfactual everywhere, then
@@ -445,6 +466,11 @@ def decide(
                 comparable_set = imputed_means.copy()
                 comparable_set[combo_ids[rows]] = perf_values[rows]
                 phi_values.append(spread(comparable_set))
+                # a background where target_dims has at least two options
+                # listed, but they all give the same result
+                is_inert.append(
+                    len(rows) >= 2 and np.all(perf_values[rows] == perf_values[rows[0]])
+                )
 
             if num_imputed > 0:
                 # the multiverse is ragged for this specific subset: at least
@@ -463,9 +489,36 @@ def decide(
                     stacklevel=2,
                 )
 
-            # aggregate the per-context spreads with Lambda (equal weight per
-            # background context by default)
-            total_effect[target_dims] = float(summary(np.asarray(phi_values)))
+            # This addresses the case where the decision doesn't apply in some
+            # backgrounds, but is still listed there (thus, there is no
+            # difference in the downstream results across its options).
+            # This can also happen by coincidence if a decision just doesn't
+            # matter as well, so we only report this proportion by default, and
+            # leave it out if the user asks to exclude these backgrounds, which
+            # is recommended if they know a priori that the decision doesn't
+            # apply in some backgrounds.
+            is_inert = np.asarray(is_inert)
+            inert_share[target_dims] = float(is_inert.mean())
+            included = ~is_inert if exclude_inert else np.ones_like(is_inert)
+            applicability_share[target_dims] = float(included.mean())
+
+            if not included.any():
+                # target_dims does not apply in any background, so there is
+                # nothing to estimate; refuse rather than guess
+                warnings.warn(
+                    f"total_effect for {target_dims} is not estimable: it does "
+                    f"not apply in any background context, so it is reported "
+                    f"as NaN.",
+                    stacklevel=2,
+                )
+                total_effect[target_dims] = np.nan
+                continue
+
+            # aggregate the per-context spreads of the included backgrounds with
+            # Lambda (each included background context contributes one value)
+            total_effect[target_dims] = float(
+                summary(np.asarray(phi_values)[included])
+            )
 
     # --- assemble per-subset results ---
     decomposition = {}
@@ -473,6 +526,8 @@ def decide(
         entry = {
             "total_effect": total_effect[target_dims],
             "main_effect": main_effect[target_dims],
+            "applicability_share": applicability_share[target_dims],
+            "inert_share": inert_share[target_dims],
         }
         # interaction_effect(S) == main_effect(S) for |S| == 1 by construction
         # (see the recursion above), so it's only reported for |S| >= 2 to
