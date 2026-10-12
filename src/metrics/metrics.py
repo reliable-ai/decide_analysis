@@ -46,6 +46,33 @@ def organize_multiverse_results(
     # get the subset of the results that apply for our analysis
     multiverse_results = multiverse_results[dimension_order + performance_metrics]
 
+    # if the multiverse is such that the option (singular) available at the jth
+    # decision is a deterministic function of the choice made at the ith
+    # decision, this means that the ith decision never varies on its own, so its
+    # importance is not identifiable since it can't be separated from i. Since
+    # the choice for the ith decision is encoded in the choice at i, we can drop
+    # the column corresponding to the choice made for decision j. We will give
+    # the user a warning in case they were not familiar that this was happening
+    # in their multiverse.
+    dimension_order = list(dimension_order)  # avoid mutating the input
+    for j in list(dimension_order):
+        if multiverse_results[j].nunique() < 2:
+            raise ValueError(
+                f"Judgment call '{j}' has only one option, so it is not a "
+                f"valid decision; remove it from dimension_order."
+            )
+        for i in dimension_order:
+            if i != j and multiverse_results.groupby(i)[j].nunique().max() == 1:
+                warnings.warn(
+                    f"Judgment call '{j}' is fully determined by '{i}', so it "
+                    f"will be merged into '{i}' and dropped as a separate "
+                    f"decision.",
+                    stacklevel=2,
+                )
+                multiverse_results = multiverse_results.drop(columns=j)
+                dimension_order.remove(j)
+                break  # since j is removed, stop searching over it
+
     # give each column a certain level using multilevel indexing to denote
     # if it is a dimension (judgment call) or a performance metric
     multiverse_results.columns = pd.MultiIndex.from_tuples(
