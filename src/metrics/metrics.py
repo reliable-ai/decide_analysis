@@ -45,6 +45,28 @@ def organize_multiverse_results(
     # get the subset of the results that apply for our analysis
     multiverse_results = multiverse_results[dimension_order + performance_metrics]
 
+    # if the input is incorrectly formatted or has some sort of sparsity that
+    # makes it impossible to accurately estimate, then we want to throw an error
+    # instead of returning bad importances.
+    missing_choices = multiverse_results[dimension_order].isna().any()
+    if missing_choices.any():
+        raise ValueError(
+            f"Judgment call(s) {list(missing_choices[missing_choices].index)} "
+            f"contain NA values; encode them as an explicit option instead."
+        )
+    metric_values = multiverse_results[performance_metrics].to_numpy(dtype=float)
+    if not np.isfinite(metric_values).all():
+        raise ValueError(
+            "Performance metric(s) contain NA or infinite values (e.g. failed "
+            "runs); drop those universes first."
+        )
+    num_duplicates = multiverse_results.duplicated(subset=dimension_order).sum()
+    if num_duplicates > 0:
+        raise ValueError(
+            f"{num_duplicates} universe(s) appear more than once (same choices "
+            f"for every judgment call); aggregate them first (e.g. over seeds)."
+        )
+
     # if the multiverse is such that the option (singular) available at the jth
     # decision is a deterministic function of the choice made at the ith
     # decision, this means that the ith decision never varies on its own, so its
@@ -274,6 +296,13 @@ def decide(
     multiverses and for irregular/ragged ones (e.g., where a judgment call only
     unlocks certain choices conditional on an upstream decision).
 
+    Sparsity is treated as structural: missing universes are assumed to be
+    invalid pipelines, so the scores describe the multiverse as given. If
+    universes are instead missing at random (e.g. failed runs, subsampling),
+    the scores are only estimates of the full multiverse's and carry sampling
+    noise; in particular, main effects are inflated for judgment calls with
+    many choices.
+
     Dispersion and aggregation are supplied as the generalized spread function
     Phi (`spread`) and summary function Lambda (`summary`). Each receives a 1-D
     numpy array of outcomes and returns a float.
@@ -289,9 +318,7 @@ def decide(
       - total_effect       DECIDE(S) = Lambda_{p_{-S}}(Phi(comparable set)):
                            the total effect of S -- the spread across S's choices
                            within each fixed background context, aggregated over
-                           contexts (with an average-case counterfactual imputed
-                           for choices of S that a context never realised).
-                           (E[Var(Y|X_{-S})] by default.)
+                           contexts. (E[Var(Y|X_{-S})] by default.)
       - interaction_effect the pure marginal (Sobol / functional-ANOVA)
                            interaction of exactly S, obtained by stripping the
                            lower-order effects out of main_effect:
@@ -304,9 +331,9 @@ def decide(
                            included for |S| >= 2. This decomposition relies on
                            the additivity of variance, so it is exact only for
                            Phi = variance / Lambda = mean and is a heuristic for
-                           other spread functions. On a ragged tree the identity
+                           other spread functions. On a sparse mv the identity
                            total = main + interaction likewise only holds
-                           approximately, since some values are imputed.
+                           approximately.
 
     Args:
         multiverse_results (pd.DataFrame): DataFrame with MultiIndex columns
@@ -322,6 +349,10 @@ def decide(
             (population variance, ddof=0).
         summary (callable, optional): Summary function Lambda mapping a 1-D numpy
             array of outcomes to an aggregate value. Defaults to np.mean.
+            With context_weight="universe", Lambda should depend only on the
+            distribution of its inputs (e.g. mean, quantiles, max), since that
+            weighting is implemented by repeating values; a sum is rejected
+            there, but is fine with context_weight="context".
         context_weight (str, optional): Only matters for sparse (non-complete)
             multiverses. In these cases, Lambda may aggregate per-background
             spreads which are taken over different numbers of choices. Denoting
@@ -347,10 +378,11 @@ def decide(
             Only relevant for sparse multiverses, each judgement call's dict
             also has a key for "applicability_share": the share of background
             contexts (weighted as in context_weight) that realize at least two
-            choices of S and thus are included in the calculation of
-            total_effect. total_effect is NaN when this share is 0. Each dict
-            also has "inert_share": the share of background contexts (weighted
-            the same way) that are inert for S (see exclude_inert).
+            choices of S (and are not inert, if exclude_inert=True) and thus
+            are included in the calculation of total_effect. total_effect is NaN
+            when this share is 0. Each dict also has "inert_share": the share of
+            background contexts (weighted the same way) that are inert for S
+            (see exclude_inert).
     """
     dimension_cols = [
         col for col in multiverse_results.columns if col[1] == "dimension"
@@ -365,31 +397,36 @@ def decide(
             f"`context_weight` must be 'universe' or 'context', got '{context_weight}'."
         )
 
+    # "universe" weighting repeats each context's spread r_i(b) times, which a
+    # sum would count r_i(b) times over
+    if context_weight == "universe" and summary in (np.sum, sum, "sum"):
+        raise ValueError(
+            "A sum `summary` is inflated by context_weight='universe'; use "
+            "context_weight='context' instead."
+        )
+
     # flatten the MultiIndex columns once up front for speed
     flat = multiverse_results.copy()
     flat.columns = [col[0] for col in multiverse_results.columns]
     perf_values = flat[performance_metric].to_numpy()
 
     def summarize_groups(names):
-        # lambda applied within each group formed by `names`.
-        # Returns the group each row belongs to alongside one summary value per
-        # group so that callers can index numpy arrays rather than
-        # slice the frame once per group.
+        # lambda applied within each group formed by `names`, returning one
+        # summary value per group. indexes numpy arrays rather than slicing
+        # the frame once per group.
         grouped = flat.groupby(list(names), sort=True)
-        group_ids = grouped.ngroup().to_numpy()
-        group_summaries = np.array(
+        return np.array(
             [
                 summary(perf_values[grouped.indices[key]])
                 for key in sorted(grouped.indices)
             ]
         )
-        return group_ids, group_summaries
 
     # --- main effects: Phi_{s_S}(Lambda_{p_{-S}}(f)) for every subset ---
     main_effect = {}
     for size in range(1, max_order + 1):
         for target_dims in combinations(dimension_names, size):
-            _, group_summaries = summarize_groups(target_dims)
+            group_summaries = summarize_groups(target_dims)
             main_effect[target_dims] = float(spread(group_summaries))
 
     # --- pure marginal (Sobol) interaction ---
