@@ -266,6 +266,7 @@ def decide(
     max_order: int = 1,
     spread=np.var,
     summary=np.mean,
+    context_weight: str = "universe",
 ) -> dict:
     """
     Single entry point for the DECIDE decomposition of a multiverse.
@@ -324,6 +325,14 @@ def decide(
             (population variance, ddof=0).
         summary (callable, optional): Summary function Lambda mapping a 1-D numpy
             array of outcomes to an aggregate value. Defaults to np.mean.
+        context_weight (str, optional): Only matters for sparse (non-complete)
+            multiverses. In these cases, Lambda may aggregate per-background
+            spreads which are taken over different numbers of choices. Denoting
+            the number of options a background b_{-i} has for the ith decision
+            as r_i(b), "universe" weights every background spread by r_i(b), so
+            that each universe counts once, while "context" weights every
+            background equally, so that another decision adding extra options in
+            another branch cannot upweight those importances.
 
     Returns:
         dict: mapping each non-empty tuple of judgment call names (up to
@@ -338,6 +347,12 @@ def decide(
 
     if max_order is None:
         max_order = len(dimension_names)
+
+    if context_weight not in ("universe", "context"):
+        raise ValueError(
+            f"`context_weight` must be 'universe' or 'context', got "
+            f"'{context_weight}'."
+        )
 
     # flatten the MultiIndex columns once up front for speed
     flat = multiverse_results.copy()
@@ -377,7 +392,7 @@ def decide(
             )
             interaction_effect[target_dims] = main_effect[target_dims] - lower
 
-    # --- total effects: ragged-tree safe total effect of every subset ---
+    # --- total effects: total effect of every subset ---
     total_effect = {}
     for size in range(1, max_order + 1):
         for target_dims in combinations(dimension_names, size):
@@ -389,13 +404,6 @@ def decide(
                 total_effect[target_dims] = float(spread(perf_values))
                 continue
 
-            # average-case counterfactual for every combination of target_dims'
-            # choices that occurs anywhere in the multiverse: Lambda over the
-            # rest of the pipeline, unconditioned on anything else. This also
-            # defines the full comparable-set space -- combinations that never
-            # occur anywhere are not considered, since there is no data to ground
-            # them in.
-            combo_ids, imputed_means = summarize_groups(target_dims)
             context_ids = flat.groupby(other_dims, sort=True).ngroup().to_numpy()
 
             # visit each background context by sorting the rows by context once,
@@ -406,43 +414,23 @@ def decide(
                 np.concatenate(([True], sorted_ids[1:] != sorted_ids[:-1]))
             )
             ends = np.concatenate((starts[1:], [len(order)]))
-            num_contexts = len(starts)
 
-            # a context is missing a combination whenever no row realises that
-            # (context, combination) pair, so count the pairs that do occur
-            num_realized = len(
-                np.unique(context_ids.astype(np.int64) * len(imputed_means) + combo_ids)
-            )
-            num_imputed = num_contexts * len(imputed_means) - num_realized
-
+            # the comparable set of each background is only the universes that
+            # actually exist there; imputing causes leakage so we do not impute,
+            # thus contexts may compare different numbers of choices
             phi_values = []
+            num_realized = []  # r_i(b): number of choices compared in context b
             for start, end in zip(starts, ends):
                 rows = order[start:end]
-                # start from the average-case counterfactual everywhere, then
-                # overwrite the combinations this context actually realised
-                comparable_set = imputed_means.copy()
-                comparable_set[combo_ids[rows]] = perf_values[rows]
-                phi_values.append(spread(comparable_set))
+                phi_values.append(spread(perf_values[rows]))
+                num_realized.append(len(rows))
 
-            if num_imputed > 0:
-                # the multiverse is ragged for this specific subset: at least
-                # one background context was missing a real outcome for one
-                # of target_dims' choices, so total_effect partly relies on
-                # imputed average-case counterfactuals rather than purely
-                # observed adjacent universes (see UNBALANCED_TREES.md). This
-                # also means total_effect ~= main_effect + interaction_effect
-                # only holds approximately for this subset.
-                warnings.warn(
-                    f"total_effect for {target_dims} used {num_imputed} "
-                    f"imputed average-case counterfactual value(s) out of "
-                    f"{num_contexts} background contexts (multiverse is "
-                    f"ragged for this subset). total_effect ~= main_effect + "
-                    f"interaction_effect will only hold approximately here.",
-                    stacklevel=2,
-                )
-
-            # aggregate the per-context spreads with Lambda (equal weight per
-            # background context by default)
+            # aggregate the per-context spreads with Lambda. with "universe"
+            # weighting, each context's spread is repeated r_i(b) times so that
+            # every universe counts once; with "context" weighting, every
+            # context counts once
+            if context_weight == "universe":
+                phi_values = np.repeat(phi_values, num_realized)
             total_effect[target_dims] = float(summary(np.asarray(phi_values)))
 
     # --- assemble per-subset results ---
