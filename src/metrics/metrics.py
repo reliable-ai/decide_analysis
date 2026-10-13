@@ -314,9 +314,12 @@ def decide(
       - total_effect       DECIDE(S) = Lambda_{p_{-S}}(Phi(comparable set)):
                            the total effect of S -- the spread across S's choices
                            within each fixed background context, aggregated over
-                           contexts (with an average-case counterfactual imputed
-                           for choices of S that a context never realised).
-                           (E[Var(Y|X_{-S})] by default.)
+                           contexts. A choice of S that a context never
+                           realised is imputed with its matched average-case
+                           counterfactual: Lambda over the universes taking that
+                           choice which agree with the context on as many other
+                           judgment calls as possible. (E[Var(Y|X_{-S})] by
+                           default.)
       - interaction_effect the pure marginal (Sobol / functional-ANOVA)
                            interaction of exactly S, obtained by stripping the
                            lower-order effects out of main_effect:
@@ -416,6 +419,11 @@ def decide(
             interaction_effect[target_dims] = main_effect[target_dims] - lower
 
     # --- total effects: total effect of every subset ---
+    # integer code of every universe's choice for each judgment call, so that
+    # universes can be matched on any subset of judgment calls (used to fill in
+    # options that are missing from a background, see matched_average below)
+    codes = {d: pd.factorize(flat[d])[0] for d in dimension_names}
+
     total_effect = {}
     applicability_share = {}
     inert_share = {}
@@ -431,13 +439,13 @@ def decide(
                 inert_share[target_dims] = float(np.all(perf_values == perf_values[0]))
                 continue
 
-            # average-case counterfactual for every combination of target_dims'
-            # choices that occurs anywhere in the multiverse: Lambda over the
-            # rest of the pipeline, unconditioned on anything else. This also
-            # defines the full comparable-set space -- combinations that never
-            # occur anywhere are not considered, since there is no data to ground
-            # them in.
-            combo_ids, imputed_means = summarize_groups(target_dims)
+            # every combination of target_dims' choices that occurs anywhere in
+            # the multiverse defines the full comparable-set space --
+            # combinations that never occur anywhere are not considered, since
+            # there is no data to ground them in. global_means (Lambda over every
+            # universe taking a combination) is the fallback counterfactual when
+            # nothing else about the background can be matched.
+            combo_ids, global_means = summarize_groups(target_dims)
             context_ids = flat.groupby(other_dims, sort=True).ngroup().to_numpy()
 
             # visit each background context by sorting the rows by context once,
@@ -448,45 +456,76 @@ def decide(
                 np.concatenate(([True], sorted_ids[1:] != sorted_ids[:-1]))
             )
             ends = np.concatenate((starts[1:], [len(order)]))
-            num_contexts = len(starts)
 
-            # a context is missing a combination whenever no row realises that
-            # (context, combination) pair, so count the pairs that do occur
-            num_realized = len(
-                np.unique(context_ids.astype(np.int64) * len(imputed_means) + combo_ids)
-            )
-            num_imputed = num_contexts * len(imputed_means) - num_realized
+            # sparsity handling in case different options exist depending on the
+            # background: a combination of target_dims that a background never
+            # realised is filled in with its matched average-case counterfactual
+            # -- Lambda over the universes taking that combination which agree
+            # with the background on as many of the other judgment calls as
+            # possible, averaging only over the ones that block the comparison.
+            # E.g. with the universe (c1=1, c2=1, c3=0) and no c3=0 anywhere
+            # else, its counterpart for c2=2 is the average of (c1=1, c2=2,
+            # c3=x). If several equally large sets of judgment calls can be
+            # matched, their universes are pooled. This does not depend on the
+            # order of the judgment calls.
+            match_index = {}  # judgment calls matched on -> {(combo, codes): rows}
+            matched_cache = {}  # pooled matches -> counterfactual value
+
+            def matched_average(combo, row):
+                """
+                If a universe does not have a counterfactual outcome for a
+                combination of target_dims, this function finds the closest
+                matching universes to compare against.
+                
+                Args:
+                    combo (int): The index of the combination of target_dims.
+                    row (int): The index of the universe in the multiverse_results DataFrame.
+                Returns:
+                    float: The average performance metric value of the matched universes.
+                """
+                for num_matched in range(len(other_dims) - 1, 0, -1):
+                    matches = []
+                    for matched_dims in combinations(other_dims, num_matched):
+                        if matched_dims not in match_index:
+                            match_index[matched_dims] = (
+                                pd.DataFrame(
+                                    {"combo": combo_ids}
+                                    | {d: codes[d] for d in matched_dims}
+                                )
+                                .groupby(["combo", *matched_dims])
+                                .indices
+                            )
+                        key = (combo, *(codes[d][row] for d in matched_dims))
+                        if key in match_index[matched_dims]:
+                            matches.append((matched_dims, key))
+                    if matches:
+                        cache_key = tuple(matches)
+                        if cache_key not in matched_cache:
+                            pooled = np.concatenate(
+                                        [match_index[dims][key] for dims, key in matches]
+                                    )
+                            matched_cache[cache_key] = summary(perf_values[pooled])
+                        return matched_cache[cache_key]
+                # nothing about the background can be matched
+                return global_means[combo]
 
             phi_values = []
+            num_options = []  # number of target_dims' options listed in each background
             is_inert = []  # whether target_dims is a no-op in each background
             for start, end in zip(starts, ends):
                 rows = order[start:end]
-                # start from the average-case counterfactual everywhere, then
-                # overwrite the combinations this context actually realised
-                comparable_set = imputed_means.copy()
+                # fill in the combinations this background never realised with
+                # their matched counterfactual, then use the realised outcomes
+                comparable_set = np.empty(len(global_means))
+                for combo in np.setdiff1d(np.arange(len(global_means)), combo_ids[rows]):
+                    comparable_set[combo] = matched_average(combo, rows[0])
                 comparable_set[combo_ids[rows]] = perf_values[rows]
                 phi_values.append(spread(comparable_set))
+                num_options.append(len(rows))
                 # a background where target_dims has at least two options
                 # listed, but they all give the same result
                 is_inert.append(
                     len(rows) >= 2 and np.all(perf_values[rows] == perf_values[rows[0]])
-                )
-
-            if num_imputed > 0:
-                # the multiverse is ragged for this specific subset: at least
-                # one background context was missing a real outcome for one
-                # of target_dims' choices, so total_effect partly relies on
-                # imputed average-case counterfactuals rather than purely
-                # observed adjacent universes (see UNBALANCED_TREES.md). This
-                # also means total_effect ~= main_effect + interaction_effect
-                # only holds approximately for this subset.
-                warnings.warn(
-                    f"total_effect for {target_dims} used {num_imputed} "
-                    f"imputed average-case counterfactual value(s) out of "
-                    f"{num_contexts} background contexts (multiverse is "
-                    f"ragged for this subset). total_effect ~= main_effect + "
-                    f"interaction_effect will only hold approximately here.",
-                    stacklevel=2,
                 )
 
             # This addresses the case where the decision doesn't apply in some
@@ -513,6 +552,29 @@ def decide(
                 )
                 total_effect[target_dims] = np.nan
                 continue
+
+            # among the included backgrounds, count the combinations of
+            # target_dims that were filled in rather than realised
+            num_options = np.asarray(num_options)
+            num_imputed = int(
+                included.sum() * len(global_means) - num_options[included].sum()
+            )
+            if num_imputed > 0:
+                # the multiverse is sparese for this specific subset: at least
+                # one background context was missing a real outcome for one
+                # of target_dims' choices, so total_effect partly relies on
+                # matched average-case counterfactuals rather than purely
+                # observed adjacent universes. This also means
+                # total_effect ~= main_effect + interaction_effect only holds
+                # approximately for this subset.
+                warnings.warn(
+                    f"total_effect for {target_dims} used {num_imputed} "
+                    f"imputed average-case counterfactual value(s) across "
+                    f"{int(included.sum())} background contexts (multiverse is "
+                    f"ragged for this subset). total_effect ~= main_effect + "
+                    f"interaction_effect will only hold approximately here.",
+                    stacklevel=2,
+                )
 
             # aggregate the per-context spreads of the included backgrounds with
             # Lambda (each included background context contributes one value)
