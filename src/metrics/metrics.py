@@ -46,6 +46,55 @@ def organize_multiverse_results(
     # get the subset of the results that apply for our analysis
     multiverse_results = multiverse_results[dimension_order + performance_metrics]
 
+    # if the input is incorrectly formatted or has some sort of sparsity that
+    # makes it impossible to accurately estimate, then we want to throw an error
+    # instead of returning bad importances.
+    missing_choices = multiverse_results[dimension_order].isna().any()
+    if missing_choices.any():
+        raise ValueError(
+            f"Judgment call(s) {list(missing_choices[missing_choices].index)} "
+            f"contain NA values; encode them as an explicit option instead."
+        )
+    metric_values = multiverse_results[performance_metrics].to_numpy(dtype=float)
+    if not np.isfinite(metric_values).all():
+        raise ValueError(
+            "Performance metric(s) contain NA or infinite values (e.g. failed "
+            "runs); drop those universes first."
+        )
+    num_duplicates = multiverse_results.duplicated(subset=dimension_order).sum()
+    if num_duplicates > 0:
+        raise ValueError(
+            f"{num_duplicates} universe(s) appear more than once (same choices "
+            f"for every judgment call); aggregate them first (e.g. over seeds)."
+        )
+
+    # if the multiverse is such that the option (singular) available at the jth
+    # decision is a deterministic function of the choice made at the ith
+    # decision, this means that the ith decision never varies on its own, so its
+    # importance is not identifiable since it can't be separated from i. Since
+    # the choice for the ith decision is encoded in the choice at i, we can drop
+    # the column corresponding to the choice made for decision j. We will give
+    # the user a warning in case they were not familiar that this was happening
+    # in their multiverse.
+    dimension_order = list(dimension_order)  # avoid mutating the input
+    for j in list(dimension_order):
+        if multiverse_results[j].nunique() < 2:
+            raise ValueError(
+                f"Judgment call '{j}' has only one option, so it is not a "
+                f"valid decision; remove it from dimension_order."
+            )
+        for i in dimension_order:
+            if i != j and multiverse_results.groupby(i)[j].nunique().max() == 1:
+                warnings.warn(
+                    f"Judgment call '{j}' is fully determined by '{i}', so it "
+                    f"will be merged into '{i}' and dropped as a separate "
+                    f"decision.",
+                    stacklevel=2,
+                )
+                multiverse_results = multiverse_results.drop(columns=j)
+                dimension_order.remove(j)
+                break  # since j is removed, stop searching over it
+
     # give each column a certain level using multilevel indexing to denote
     # if it is a dimension (judgment call) or a performance metric
     multiverse_results.columns = pd.MultiIndex.from_tuples(
@@ -239,6 +288,8 @@ def decide(
     max_order: int = 1,
     spread=np.var,
     summary=np.mean,
+    exclude_inert: bool = False,
+    conditional_decisions: dict = None,
 ) -> dict:
     """
     Single entry point for the DECIDE decomposition of a multiverse.
@@ -260,13 +311,19 @@ def decide(
                            "closed" first-to-|S|-order effect of S -- how much
                            the summarised outcome moves as S's choices vary,
                            aggregating over everything else. (Var(E[Y|X_S]) by
-                           default.)
+                           default.) Universes in background contexts that are
+                           left out of total_effect (see exclude_inert and
+                           conditional_decisions) are left out here too, so that
+                           both are computed over the same universes.
       - total_effect       DECIDE(S) = Lambda_{p_{-S}}(Phi(comparable set)):
                            the total effect of S -- the spread across S's choices
                            within each fixed background context, aggregated over
-                           contexts (with an average-case counterfactual imputed
-                           for choices of S that a context never realised).
-                           (E[Var(Y|X_{-S})] by default.)
+                           contexts. A choice of S that a context never
+                           realised is imputed with its matched average-case
+                           counterfactual: Lambda over the universes taking that
+                           choice which agree with the context on as many other
+                           judgment calls as possible. (E[Var(Y|X_{-S})] by
+                           default.)
       - interaction_effect the pure marginal (Sobol / functional-ANOVA)
                            interaction of exactly S, obtained by stripping the
                            lower-order effects out of main_effect:
@@ -297,12 +354,42 @@ def decide(
             (population variance, ddof=0).
         summary (callable, optional): Summary function Lambda mapping a 1-D numpy
             array of outcomes to an aggregate value. Defaults to np.mean.
+        exclude_inert (bool, optional): Some decisions do not apply in certain
+            backgrounds but are still listed there, so all of their options
+            give identical results (e.g. in YRBS, combination when y_variable
+            is a singleton). Identical results can also happen by coincidence
+            when the decision does apply (e.g. with discrete outcomes), so by
+            default (False) these backgrounds are kept as zeros and only
+            reported through "inert_share". Set to True to calculate the
+            importances (total and main) only over the backgrounds where the
+            decision applies.
+        conditional_decisions (dict, optional): Judgment calls that only apply
+            when other judgment calls take certain options, mapping each such
+            judgment call to {other judgment call: [options where it applies]}.
+            E.g. in MTF, y_variable only varies for 5 of the 13 x_variables, so
+            {"y_variable": {"x_variable": [<those 5 options>]}} declares that
+            y_variable does not apply for the other 8. Background contexts where
+            a declared judgment call does not apply are left out of its
+            importances (total and main) instead of being compared against
+            imputed counterfactuals. Several conditions for one judgment call
+            must all hold. For a subset S of several judgment calls, a
+            background is left out only if none of S's judgment calls apply
+            there; a declaration whose condition involves a judgment call in S
+            is ignored for S, since S's options are then compared jointly.
 
     Returns:
         dict: mapping each non-empty tuple of judgment call names (up to
-            max_order) to a dict with keys "var_total", "main_effect", and
+            max_order) to a dict with keys "main_effect" and
             "total_effect", plus "interaction_effect" for subsets with
             |S| >= 2 (omitted for singletons -- see interaction_effect above).
+            Only relevant for sparse multiverses, each judgment call's dict also
+            has "applicability_share", the proportion of backgrounds included in
+            total_effect (left out are inert backgrounds if exclude_inert=True,
+            and backgrounds where a declared conditional decision does not
+            apply), and "inert_share", the proportion of backgrounds where all
+            options give identical results (see exclude_inert). With
+            Lambda = mean, total_effect * applicability_share equals the
+            total_effect obtained by counting the left-out backgrounds as zero.
     """
     dimension_cols = [
         col for col in multiverse_results.columns if col[1] == "dimension"
@@ -317,23 +404,257 @@ def decide(
     flat.columns = [col[0] for col in multiverse_results.columns]
     perf_values = flat[performance_metric].to_numpy()
 
-    def summarize_groups(names):
-        # lambda applied within each group formed by `names`.
+    # judgment calls that only apply when other judgment calls take certain
+    # options (declared by the user, see conditional_decisions above). for each,
+    # record whether it applies in every universe
+    conditional_decisions = conditional_decisions or {}
+    applies_in_universe = {}
+    for decision, conditions in conditional_decisions.items():
+        for name in [decision, *conditions]:
+            if name not in dimension_names:
+                raise ValueError(
+                    f"conditional_decisions refers to judgment call '{name}', "
+                    f"which is not in the multiverse (it may have been merged "
+                    f"into another judgment call by organize_multiverse_results)."
+                )
+        for condition_dim, options in conditions.items():
+            never_occur = [o for o in options if o not in set(flat[condition_dim])]
+            if never_occur:
+                raise ValueError(
+                    f"conditional_decisions: option(s) {never_occur} never occur "
+                    f"for judgment call '{condition_dim}'."
+                )
+        applies_in_universe[decision] = np.logical_and.reduce(
+            [flat[c].isin(o).to_numpy() for c, o in conditions.items()]
+        )
+
+    def summarize_groups(names, used=None):
+        # lambda applied within each group formed by `names`, over the universes
+        # marked in the boolean array `used` (all universes by default).
         # Returns the group each row belongs to alongside one summary value per
         # group so that callers can index numpy arrays rather than
         # slice the frame once per group.
-        grouped = flat.groupby(list(names), sort=True)
+        frame, values = (flat, perf_values) if used is None else (flat[used], perf_values[used])
+        grouped = frame.groupby(list(names), sort=True)
         group_ids = grouped.ngroup().to_numpy()
         group_summaries = np.array(
-            [summary(perf_values[grouped.indices[key]]) for key in sorted(grouped.indices)]
+            [summary(values[grouped.indices[key]]) for key in sorted(grouped.indices)]
         )
         return group_ids, group_summaries
 
+    # --- total effects: total effect of every subset ---
+    # integer code of every universe's choice for each judgment call, so that
+    # universes can be matched on any subset of judgment calls (used to fill in
+    # options that are missing from a background, see matched_average below)
+    codes = {d: pd.factorize(flat[d])[0] for d in dimension_names}
+
+    total_effect = {}
+    applicability_share = {}
+    inert_share = {}
+    included_universes = {}  # universes used for the importances of each subset
+    for size in range(1, max_order + 1):
+        for target_dims in combinations(dimension_names, size):
+            other_dims = [d for d in dimension_names if d not in target_dims]
+
+            if not other_dims:
+                # target_dims covers every decision: one background context (the
+                # whole dataset), every combination of target_dims is real, and
+                # every declared condition involves a judgment call in S.
+                total_effect[target_dims] = float(spread(perf_values))
+                applicability_share[target_dims] = 1.0
+                inert_share[target_dims] = float(np.all(perf_values == perf_values[0]))
+                included_universes[target_dims] = np.ones(len(perf_values), dtype=bool)
+                continue
+
+            # whether target_dims applies in each universe according to the
+            # declared conditional decisions: S applies wherever at least one of
+            # its judgment calls does. undeclared judgment calls always apply, and
+            # a declaration whose condition involves a judgment call in S is
+            # ignored, since S's options are then compared jointly. the result is
+            # constant within a background context, since every condition left
+            # refers only to judgment calls that the background fixes.
+            s_applies = np.zeros(len(perf_values), dtype=bool)
+            for d in target_dims:
+                conditions = conditional_decisions.get(d)
+                if conditions is None or any(c in target_dims for c in conditions):
+                    s_applies[:] = True
+                    break
+                s_applies |= applies_in_universe[d]
+
+            # every combination of target_dims' choices that occurs anywhere in
+            # the multiverse defines the full comparable-set space --
+            # combinations that never occur anywhere are not considered, since
+            # there is no data to ground them in. global_means (Lambda over every
+            # universe taking a combination) is the fallback counterfactual when
+            # nothing else about the background can be matched.
+            combo_ids, global_means = summarize_groups(target_dims)
+            context_ids = flat.groupby(other_dims, sort=True).ngroup().to_numpy()
+
+            # visit each background context by sorting the rows by context once,
+            # rather than slicing the frame once per context
+            order = np.argsort(context_ids, kind="stable")
+            sorted_ids = context_ids[order]
+            starts = np.flatnonzero(
+                np.concatenate(([True], sorted_ids[1:] != sorted_ids[:-1]))
+            )
+            ends = np.concatenate((starts[1:], [len(order)]))
+
+            # sparsity handling in case different options exist depending on the
+            # background: a combination of target_dims that a background never
+            # realised is filled in with its matched average-case counterfactual
+            # -- Lambda over the universes taking that combination which agree
+            # with the background on as many of the other judgment calls as
+            # possible, averaging only over the ones that block the comparison.
+            # E.g. with the universe (c1=1, c2=1, c3=0) and no c3=0 anywhere
+            # else, its counterpart for c2=2 is the average of (c1=1, c2=2,
+            # c3=x). If several equally large sets of judgment calls can be
+            # matched, their universes are pooled. This does not depend on the
+            # order of the judgment calls.
+            match_index = {}  # judgment calls matched on -> {(combo, codes): rows}
+            matched_cache = {}  # pooled matches -> counterfactual value
+
+            def matched_average(combo, row):
+                """
+                If a universe does not have a counterfactual outcome for a
+                combination of target_dims, this function finds the closest
+                matching universes to compare against.
+                
+                Args:
+                    combo (int): The index of the combination of target_dims.
+                    row (int): The index of the universe in the multiverse_results DataFrame.
+                Returns:
+                    float: The average performance metric value of the matched universes.
+                """
+                for num_matched in range(len(other_dims) - 1, 0, -1):
+                    matches = []
+                    for matched_dims in combinations(other_dims, num_matched):
+                        if matched_dims not in match_index:
+                            match_index[matched_dims] = (
+                                pd.DataFrame(
+                                    {"combo": combo_ids}
+                                    | {d: codes[d] for d in matched_dims}
+                                )
+                                .groupby(["combo", *matched_dims])
+                                .indices
+                            )
+                        key = (combo, *(codes[d][row] for d in matched_dims))
+                        if key in match_index[matched_dims]:
+                            matches.append((matched_dims, key))
+                    if matches:
+                        cache_key = tuple(matches)
+                        if cache_key not in matched_cache:
+                            pooled = np.concatenate(
+                                        [match_index[dims][key] for dims, key in matches]
+                                    )
+                            matched_cache[cache_key] = summary(perf_values[pooled])
+                        return matched_cache[cache_key]
+                # nothing about the background can be matched
+                return global_means[combo]
+
+            phi_values = []
+            num_options = []  # number of target_dims' options listed in each background
+            is_inert = []  # whether target_dims is a no-op in each background
+            declared_applies = []  # whether target_dims applies in each background
+            for start, end in zip(starts, ends):
+                rows = order[start:end]
+                num_options.append(len(rows))
+                # a background where target_dims has at least two options
+                # listed, but they all give the same result
+                is_inert.append(
+                    len(rows) >= 2 and np.all(perf_values[rows] == perf_values[rows[0]])
+                )
+                declared_applies.append(s_applies[rows[0]])
+                if not declared_applies[-1]:
+                    # declared not to apply here, so nothing is compared
+                    phi_values.append(np.nan)
+                    continue
+                # fill in the combinations this background never realised with
+                # their matched counterfactual, then use the realised outcomes
+                comparable_set = np.empty(len(global_means))
+                for combo in np.setdiff1d(np.arange(len(global_means)), combo_ids[rows]):
+                    comparable_set[combo] = matched_average(combo, rows[0])
+                comparable_set[combo_ids[rows]] = perf_values[rows]
+                phi_values.append(spread(comparable_set))
+
+            # This addresses the case where the decision doesn't apply in some
+            # backgrounds, but is still listed there (thus, there is no
+            # difference in the downstream results across its options).
+            # This can also happen by coincidence if a decision just doesn't
+            # matter as well, so we only report this proportion by default, and
+            # leave it out if the user asks to exclude these backgrounds, which
+            # is recommended if they know a priori that the decision doesn't
+            # apply in some backgrounds.
+            is_inert = np.asarray(is_inert)
+            inert_share[target_dims] = float(is_inert.mean())
+            included = ~is_inert if exclude_inert else np.ones_like(is_inert)
+
+            # this addresses the case where a judgment call was declared to only
+            # apply when other judgment calls take certain options (see
+            # conditional_decisions): backgrounds where it does not apply are
+            # left out rather than compared against imputed counterfactuals
+            included &= np.asarray(declared_applies)
+            applicability_share[target_dims] = float(included.mean())
+
+            # the universes of the included backgrounds, which the main effect
+            # is also computed over
+            included_universes[target_dims] = np.zeros(len(perf_values), dtype=bool)
+            for start, end, keep in zip(starts, ends, included):
+                if keep:
+                    included_universes[target_dims][order[start:end]] = True
+
+            if not included.any():
+                # target_dims does not apply in any background, so there is
+                # nothing to estimate; refuse rather than guess
+                warnings.warn(
+                    f"total_effect for {target_dims} is not estimable: it does "
+                    f"not apply in any background context (all are inert with "
+                    f"exclude_inert=True, or declared not to apply in "
+                    f"conditional_decisions), so it is reported as NaN.",
+                    stacklevel=2,
+                )
+                total_effect[target_dims] = np.nan
+                continue
+
+            # among the included backgrounds, count the combinations of
+            # target_dims that were filled in rather than realised
+            num_options = np.asarray(num_options)
+            num_imputed = int(
+                included.sum() * len(global_means) - num_options[included].sum()
+            )
+            if num_imputed > 0:
+                # the multiverse is sparese for this specific subset: at least
+                # one background context was missing a real outcome for one
+                # of target_dims' choices, so total_effect partly relies on
+                # matched average-case counterfactuals rather than purely
+                # observed adjacent universes. This also means
+                # total_effect ~= main_effect + interaction_effect only holds
+                # approximately for this subset.
+                warnings.warn(
+                    f"total_effect for {target_dims} used {num_imputed} "
+                    f"imputed average-case counterfactual value(s) across "
+                    f"{int(included.sum())} background contexts (multiverse is "
+                    f"ragged for this subset). total_effect ~= main_effect + "
+                    f"interaction_effect will only hold approximately here.",
+                    stacklevel=2,
+                )
+
+            # aggregate the per-context spreads of the included backgrounds with
+            # Lambda (each included background context contributes one value)
+            total_effect[target_dims] = float(
+                summary(np.asarray(phi_values)[included])
+            )
+
     # --- main effects: Phi_{s_S}(Lambda_{p_{-S}}(f)) for every subset ---
+    # computed over the same universes as the total effect, i.e. leaving out the
+    # background contexts where S does not apply (see the total effects above)
     main_effect = {}
     for size in range(1, max_order + 1):
         for target_dims in combinations(dimension_names, size):
-            _, group_summaries = summarize_groups(target_dims)
+            used = included_universes[target_dims]
+            if not used.any():
+                main_effect[target_dims] = np.nan
+                continue
+            _, group_summaries = summarize_groups(target_dims, used)
             main_effect[target_dims] = float(spread(group_summaries))
 
     # --- pure marginal (Sobol) interaction ---
@@ -350,80 +671,14 @@ def decide(
             )
             interaction_effect[target_dims] = main_effect[target_dims] - lower
 
-    # --- total effects: ragged-tree safe total effect of every subset ---
-    total_effect = {}
-    for size in range(1, max_order + 1):
-        for target_dims in combinations(dimension_names, size):
-            other_dims = [d for d in dimension_names if d not in target_dims]
-
-            if not other_dims:
-                # target_dims covers every decision: one background context (the
-                # whole dataset), every combination of target_dims is real.
-                total_effect[target_dims] = float(spread(perf_values))
-                continue
-
-            # average-case counterfactual for every combination of target_dims'
-            # choices that occurs anywhere in the multiverse: Lambda over the
-            # rest of the pipeline, unconditioned on anything else. This also
-            # defines the full comparable-set space -- combinations that never
-            # occur anywhere are not considered, since there is no data to ground
-            # them in.
-            combo_ids, imputed_means = summarize_groups(target_dims)
-            context_ids = flat.groupby(other_dims, sort=True).ngroup().to_numpy()
-
-            # visit each background context by sorting the rows by context once,
-            # rather than slicing the frame once per context
-            order = np.argsort(context_ids, kind="stable")
-            sorted_ids = context_ids[order]
-            starts = np.flatnonzero(
-                np.concatenate(([True], sorted_ids[1:] != sorted_ids[:-1]))
-            )
-            ends = np.concatenate((starts[1:], [len(order)]))
-            num_contexts = len(starts)
-
-            # a context is missing a combination whenever no row realises that
-            # (context, combination) pair, so count the pairs that do occur
-            num_realized = len(
-                np.unique(context_ids.astype(np.int64) * len(imputed_means) + combo_ids)
-            )
-            num_imputed = num_contexts * len(imputed_means) - num_realized
-
-            phi_values = []
-            for start, end in zip(starts, ends):
-                rows = order[start:end]
-                # start from the average-case counterfactual everywhere, then
-                # overwrite the combinations this context actually realised
-                comparable_set = imputed_means.copy()
-                comparable_set[combo_ids[rows]] = perf_values[rows]
-                phi_values.append(spread(comparable_set))
-
-            if num_imputed > 0:
-                # the multiverse is ragged for this specific subset: at least
-                # one background context was missing a real outcome for one
-                # of target_dims' choices, so total_effect partly relies on
-                # imputed average-case counterfactuals rather than purely
-                # observed adjacent universes (see UNBALANCED_TREES.md). This
-                # also means total_effect ~= main_effect + interaction_effect
-                # only holds approximately for this subset.
-                warnings.warn(
-                    f"total_effect for {target_dims} used {num_imputed} "
-                    f"imputed average-case counterfactual value(s) out of "
-                    f"{num_contexts} background contexts (multiverse is "
-                    f"ragged for this subset). total_effect ~= main_effect + "
-                    f"interaction_effect will only hold approximately here.",
-                    stacklevel=2,
-                )
-
-            # aggregate the per-context spreads with Lambda (equal weight per
-            # background context by default)
-            total_effect[target_dims] = float(summary(np.asarray(phi_values)))
-
     # --- assemble per-subset results ---
     decomposition = {}
     for target_dims in main_effect:
         entry = {
             "total_effect": total_effect[target_dims],
             "main_effect": main_effect[target_dims],
+            "applicability_share": applicability_share[target_dims],
+            "inert_share": inert_share[target_dims],
         }
         # interaction_effect(S) == main_effect(S) for |S| == 1 by construction
         # (see the recursion above), so it's only reported for |S| >= 2 to
