@@ -289,6 +289,7 @@ def decide(
     spread=np.var,
     summary=np.mean,
     exclude_inert: bool = False,
+    conditional_decisions: dict = None,
 ) -> dict:
     """
     Single entry point for the DECIDE decomposition of a multiverse.
@@ -310,7 +311,10 @@ def decide(
                            "closed" first-to-|S|-order effect of S -- how much
                            the summarised outcome moves as S's choices vary,
                            aggregating over everything else. (Var(E[Y|X_S]) by
-                           default.)
+                           default.) Universes in background contexts that are
+                           left out of total_effect (see exclude_inert and
+                           conditional_decisions) are left out here too, so that
+                           both are computed over the same universes.
       - total_effect       DECIDE(S) = Lambda_{p_{-S}}(Phi(comparable set)):
                            the total effect of S -- the spread across S's choices
                            within each fixed background context, aggregated over
@@ -357,7 +361,21 @@ def decide(
             when the decision does apply (e.g. with discrete outcomes), so by
             default (False) these backgrounds are kept as zeros and only
             reported through "inert_share". Set to True to calculate the
-            importance only over the backgrounds where the decision applies.
+            importances (total and main) only over the backgrounds where the
+            decision applies.
+        conditional_decisions (dict, optional): Judgment calls that only apply
+            when other judgment calls take certain options, mapping each such
+            judgment call to {other judgment call: [options where it applies]}.
+            E.g. in MTF, y_variable only varies for 5 of the 13 x_variables, so
+            {"y_variable": {"x_variable": [<those 5 options>]}} declares that
+            y_variable does not apply for the other 8. Background contexts where
+            a declared judgment call does not apply are left out of its
+            importances (total and main) instead of being compared against
+            imputed counterfactuals. Several conditions for one judgment call
+            must all hold. For a subset S of several judgment calls, a
+            background is left out only if none of S's judgment calls apply
+            there; a declaration whose condition involves a judgment call in S
+            is ignored for S, since S's options are then compared jointly.
 
     Returns:
         dict: mapping each non-empty tuple of judgment call names (up to
@@ -366,11 +384,12 @@ def decide(
             |S| >= 2 (omitted for singletons -- see interaction_effect above).
             Only relevant for sparse multiverses, each judgment call's dict also
             has "applicability_share", the proportion of backgrounds included in
-            total_effect, and "inert_share", the proportion of backgrounds where
-            all options give identical results (see exclude_inert). With
-            Lambda = mean and exclude_inert=True, total_effect *
-            applicability_share equals the total_effect obtained with
-            exclude_inert=False.
+            total_effect (left out are inert backgrounds if exclude_inert=True,
+            and backgrounds where a declared conditional decision does not
+            apply), and "inert_share", the proportion of backgrounds where all
+            options give identical results (see exclude_inert). With
+            Lambda = mean, total_effect * applicability_share equals the
+            total_effect obtained by counting the left-out backgrounds as zero.
     """
     dimension_cols = [
         col for col in multiverse_results.columns if col[1] == "dimension"
@@ -385,38 +404,43 @@ def decide(
     flat.columns = [col[0] for col in multiverse_results.columns]
     perf_values = flat[performance_metric].to_numpy()
 
-    def summarize_groups(names):
-        # lambda applied within each group formed by `names`.
+    # judgment calls that only apply when other judgment calls take certain
+    # options (declared by the user, see conditional_decisions above). for each,
+    # record whether it applies in every universe
+    conditional_decisions = conditional_decisions or {}
+    applies_in_universe = {}
+    for decision, conditions in conditional_decisions.items():
+        for name in [decision, *conditions]:
+            if name not in dimension_names:
+                raise ValueError(
+                    f"conditional_decisions refers to judgment call '{name}', "
+                    f"which is not in the multiverse (it may have been merged "
+                    f"into another judgment call by organize_multiverse_results)."
+                )
+        for condition_dim, options in conditions.items():
+            never_occur = [o for o in options if o not in set(flat[condition_dim])]
+            if never_occur:
+                raise ValueError(
+                    f"conditional_decisions: option(s) {never_occur} never occur "
+                    f"for judgment call '{condition_dim}'."
+                )
+        applies_in_universe[decision] = np.logical_and.reduce(
+            [flat[c].isin(o).to_numpy() for c, o in conditions.items()]
+        )
+
+    def summarize_groups(names, used=None):
+        # lambda applied within each group formed by `names`, over the universes
+        # marked in the boolean array `used` (all universes by default).
         # Returns the group each row belongs to alongside one summary value per
         # group so that callers can index numpy arrays rather than
         # slice the frame once per group.
-        grouped = flat.groupby(list(names), sort=True)
+        frame, values = (flat, perf_values) if used is None else (flat[used], perf_values[used])
+        grouped = frame.groupby(list(names), sort=True)
         group_ids = grouped.ngroup().to_numpy()
         group_summaries = np.array(
-            [summary(perf_values[grouped.indices[key]]) for key in sorted(grouped.indices)]
+            [summary(values[grouped.indices[key]]) for key in sorted(grouped.indices)]
         )
         return group_ids, group_summaries
-
-    # --- main effects: Phi_{s_S}(Lambda_{p_{-S}}(f)) for every subset ---
-    main_effect = {}
-    for size in range(1, max_order + 1):
-        for target_dims in combinations(dimension_names, size):
-            _, group_summaries = summarize_groups(target_dims)
-            main_effect[target_dims] = float(spread(group_summaries))
-
-    # --- pure marginal (Sobol) interaction ---
-    # interaction_effect(S) = main_effect(S) - sum over proper subsets T of S of
-    # interaction_effect(T). Because every proper subset of an S with
-    # |S| <= max_order is itself enumerated above, this is always well-defined.
-    interaction_effect = {}
-    for size in range(1, max_order + 1):
-        for target_dims in combinations(dimension_names, size):
-            lower = sum(
-                interaction_effect[sub]
-                for r in range(1, size) # no-op if size=1, so nothing happens
-                for sub in combinations(target_dims, r)
-            )
-            interaction_effect[target_dims] = main_effect[target_dims] - lower
 
     # --- total effects: total effect of every subset ---
     # integer code of every universe's choice for each judgment call, so that
@@ -427,17 +451,35 @@ def decide(
     total_effect = {}
     applicability_share = {}
     inert_share = {}
+    included_universes = {}  # universes used for the importances of each subset
     for size in range(1, max_order + 1):
         for target_dims in combinations(dimension_names, size):
             other_dims = [d for d in dimension_names if d not in target_dims]
 
             if not other_dims:
                 # target_dims covers every decision: one background context (the
-                # whole dataset), every combination of target_dims is real.
+                # whole dataset), every combination of target_dims is real, and
+                # every declared condition involves a judgment call in S.
                 total_effect[target_dims] = float(spread(perf_values))
                 applicability_share[target_dims] = 1.0
                 inert_share[target_dims] = float(np.all(perf_values == perf_values[0]))
+                included_universes[target_dims] = np.ones(len(perf_values), dtype=bool)
                 continue
+
+            # whether target_dims applies in each universe according to the
+            # declared conditional decisions: S applies wherever at least one of
+            # its judgment calls does. undeclared judgment calls always apply, and
+            # a declaration whose condition involves a judgment call in S is
+            # ignored, since S's options are then compared jointly. the result is
+            # constant within a background context, since every condition left
+            # refers only to judgment calls that the background fixes.
+            s_applies = np.zeros(len(perf_values), dtype=bool)
+            for d in target_dims:
+                conditions = conditional_decisions.get(d)
+                if conditions is None or any(c in target_dims for c in conditions):
+                    s_applies[:] = True
+                    break
+                s_applies |= applies_in_universe[d]
 
             # every combination of target_dims' choices that occurs anywhere in
             # the multiverse defines the full comparable-set space --
@@ -512,8 +554,20 @@ def decide(
             phi_values = []
             num_options = []  # number of target_dims' options listed in each background
             is_inert = []  # whether target_dims is a no-op in each background
+            declared_applies = []  # whether target_dims applies in each background
             for start, end in zip(starts, ends):
                 rows = order[start:end]
+                num_options.append(len(rows))
+                # a background where target_dims has at least two options
+                # listed, but they all give the same result
+                is_inert.append(
+                    len(rows) >= 2 and np.all(perf_values[rows] == perf_values[rows[0]])
+                )
+                declared_applies.append(s_applies[rows[0]])
+                if not declared_applies[-1]:
+                    # declared not to apply here, so nothing is compared
+                    phi_values.append(np.nan)
+                    continue
                 # fill in the combinations this background never realised with
                 # their matched counterfactual, then use the realised outcomes
                 comparable_set = np.empty(len(global_means))
@@ -521,12 +575,6 @@ def decide(
                     comparable_set[combo] = matched_average(combo, rows[0])
                 comparable_set[combo_ids[rows]] = perf_values[rows]
                 phi_values.append(spread(comparable_set))
-                num_options.append(len(rows))
-                # a background where target_dims has at least two options
-                # listed, but they all give the same result
-                is_inert.append(
-                    len(rows) >= 2 and np.all(perf_values[rows] == perf_values[rows[0]])
-                )
 
             # This addresses the case where the decision doesn't apply in some
             # backgrounds, but is still listed there (thus, there is no
@@ -539,15 +587,29 @@ def decide(
             is_inert = np.asarray(is_inert)
             inert_share[target_dims] = float(is_inert.mean())
             included = ~is_inert if exclude_inert else np.ones_like(is_inert)
+
+            # this addresses the case where a judgment call was declared to only
+            # apply when other judgment calls take certain options (see
+            # conditional_decisions): backgrounds where it does not apply are
+            # left out rather than compared against imputed counterfactuals
+            included &= np.asarray(declared_applies)
             applicability_share[target_dims] = float(included.mean())
+
+            # the universes of the included backgrounds, which the main effect
+            # is also computed over
+            included_universes[target_dims] = np.zeros(len(perf_values), dtype=bool)
+            for start, end, keep in zip(starts, ends, included):
+                if keep:
+                    included_universes[target_dims][order[start:end]] = True
 
             if not included.any():
                 # target_dims does not apply in any background, so there is
                 # nothing to estimate; refuse rather than guess
                 warnings.warn(
                     f"total_effect for {target_dims} is not estimable: it does "
-                    f"not apply in any background context, so it is reported "
-                    f"as NaN.",
+                    f"not apply in any background context (all are inert with "
+                    f"exclude_inert=True, or declared not to apply in "
+                    f"conditional_decisions), so it is reported as NaN.",
                     stacklevel=2,
                 )
                 total_effect[target_dims] = np.nan
@@ -581,6 +643,33 @@ def decide(
             total_effect[target_dims] = float(
                 summary(np.asarray(phi_values)[included])
             )
+
+    # --- main effects: Phi_{s_S}(Lambda_{p_{-S}}(f)) for every subset ---
+    # computed over the same universes as the total effect, i.e. leaving out the
+    # background contexts where S does not apply (see the total effects above)
+    main_effect = {}
+    for size in range(1, max_order + 1):
+        for target_dims in combinations(dimension_names, size):
+            used = included_universes[target_dims]
+            if not used.any():
+                main_effect[target_dims] = np.nan
+                continue
+            _, group_summaries = summarize_groups(target_dims, used)
+            main_effect[target_dims] = float(spread(group_summaries))
+
+    # --- pure marginal (Sobol) interaction ---
+    # interaction_effect(S) = main_effect(S) - sum over proper subsets T of S of
+    # interaction_effect(T). Because every proper subset of an S with
+    # |S| <= max_order is itself enumerated above, this is always well-defined.
+    interaction_effect = {}
+    for size in range(1, max_order + 1):
+        for target_dims in combinations(dimension_names, size):
+            lower = sum(
+                interaction_effect[sub]
+                for r in range(1, size) # no-op if size=1, so nothing happens
+                for sub in combinations(target_dims, r)
+            )
+            interaction_effect[target_dims] = main_effect[target_dims] - lower
 
     # --- assemble per-subset results ---
     decomposition = {}
