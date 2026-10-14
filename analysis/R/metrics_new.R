@@ -41,6 +41,92 @@ organize_multiverse_results <- function (mv, dimension_order, performance_metric
   return(mv)
 }
 
+# In the Python implementation, functional dependence is handled within the
+# `organize_multiverse_results` function, which is called on each multiverse.
+# Since the results in the paper are from the R code, and the R code base does
+# not utilize the `organize_multiverse_results` function (at least not now), we
+# fix this case using this helper function which will be called by both
+# `load_multiverse` (so that every importance method, e.g., regression, fANOVA)
+# sees the same judgment calls (and comparisons are fair), and `decide`, so that
+# DECIDE behaves the same regardless of how it is called.
+#
+# If the input is incorrectly formatted, we throw an error instead of returning
+# bad importances. `colname_metric` is optional, since a loaded multiverse holds
+# several metrics, some of which may legitimately be missing.
+#
+# If the choice for judgment call i fully determines the choice for judgment
+# call j, then j never varies on its own, so its importance can't be separated
+# from i's. Since i's column already encodes j's choice, we merge the two by
+# dropping j, and warn the user in case they were not aware of this.
+check_and_merge_decisions <- function (mv, colname_metric = NULL,
+                                       dim_prefix = "mv_dim_") {
+  
+  # get the decisions by getting cols starting with prefix
+  dims <- mv |> select(starts_with(dim_prefix)) |> colnames()
+
+  # if the input is incorrectly formatted or has some sort of sparsity that
+  # makes it impossible to accurately estimate, then we want to throw an error
+  # instead of returning bad importances.
+  missing_choices <- dims[vapply(mv[dims], anyNA, logical(1))]
+  if (length(missing_choices) > 0) {
+    stop(
+      "Judgment call(s) ", paste(missing_choices, collapse = ", "),
+      " contain NA values; encode them as an explicit option instead.",
+      call. = FALSE
+    )
+  }
+  if (!is.null(colname_metric) && !all(is.finite(mv[[colname_metric]]))) {
+    stop(
+      "Performance metric '", colname_metric, "' contains NA or infinite ",
+      "values (e.g. failed runs); drop those universes first.",
+      call. = FALSE
+    )
+  }
+  num_duplicates <- sum(duplicated(mv[dims]))
+  if (num_duplicates > 0) {
+    stop(
+      num_duplicates, " universe(s) appear more than once (same choices for ",
+      "every judgment call); aggregate them first (e.g. over seeds).",
+      call. = FALSE
+    )
+  }
+
+  # if the multiverse is such that the option (singular) available at the jth
+  # decision is a deterministic function of the choice made at the ith
+  # decision, this means that the ith decision never varies on its own, so its
+  # importance is not identifiable since it can't be separated from i. Since
+  # the choice for the ith decision is encoded in the choice at i, we can drop
+  # the column corresponding to the choice made for decision j. We will give
+  # the user a warning in case they were not familiar that this was happening
+  # in their multiverse.
+  for (j in dims) {
+    # if there is only one option across all universes, it is not a decision
+    if (n_distinct(mv[[j]]) < 2) {
+      stop(
+        "Judgment call '", j, "' has only one option, so it is not a valid ",
+        "decision; remove it from the multiverse.",
+        call. = FALSE
+      )
+    }
+    for (i in setdiff(dims, j)) {
+      # j is a function of i exactly when each option of i co-occurs with only
+      # one option of j, i.e. there are as many (i, j) pairs as options of i
+      if (nrow(distinct(mv[c(i, j)])) == n_distinct(mv[[i]])) {
+        warning(
+          "Judgment call '", j, "' is fully determined by '", i, "', so it ",
+          "will be merged into '", i, "' and dropped as a separate decision.",
+          call. = FALSE
+        )
+        mv <- mv |> select(-all_of(j))
+        dims <- setdiff(dims, j)
+        break # since j is removed, stop searching over it
+      }
+    }
+  }
+
+  return(mv)
+}
+
 # Mean decrease in within-bucket variation for each judgment call. Because the
 # judgment calls are ordered chronologically, the buckets at depth d of the
 # decision tree are the combinations of the first d judgment calls: the decision
@@ -147,6 +233,9 @@ decide <- function (
   report_all = FALSE,
   dim_prefix = "mv_dim_"
 ) {
+
+  # fix sparsity from functional dependence by merging decisions, if applicable
+  mv <- check_and_merge_decisions(mv, colname_metric, dim_prefix = dim_prefix)
   dims <- mv |> select(starts_with(dim_prefix)) |> colnames()
 
   if (is.null(max_order)) max_order <- length(dims)
