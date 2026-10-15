@@ -198,9 +198,11 @@ naive_tree_based_importance <- function (mv, colname_metric, dim_prefix = "mv_di
 #                       everything else. (Var(E[Y|X_S]) by default.)
 #   total_effect        DECIDE(S) = Lambda_{p_{-S}}(Phi(comparable set)): the
 #                       total effect of S -- the spread across S's choices within
-#                       each fixed background context, aggregated over contexts
-#                       (with an average-case counterfactual imputed for choices
-#                       of S that a context never realised).
+#                       each fixed background context, aggregated over contexts.
+#                       A choice of S that a context never realised is imputed
+#                       with its matched average-case counterfactual: Lambda over
+#                       the universes taking that choice which agree with the
+#                       context on as many other judgment calls as possible.
 #                       (E[Var(Y|X_{-S})] by default.)
 #   interaction_effect  the pure marginal (Sobol / functional-ANOVA) interaction
 #                       of exactly S, obtained by stripping the lower-order
@@ -311,12 +313,14 @@ decide <- function (
       ))
     }
 
-    # average-case counterfactual for every combination of target_dims' choices
-    # that occurs anywhere in the multiverse: Lambda over the rest of the
-    # pipeline, unconditioned on anything else. This also defines the full
-    # comparable-set space -- combinations that never occur anywhere are not
-    # considered, since there is no data to ground them in.
-    imputed <- summarize_groups(target_dims) |> rename(v_imputed = v)
+    # every combination of target_dims' choices that occurs anywhere in the
+    # multiverse defines the full comparable-set space -- combinations that
+    # never occur anywhere are not considered, since there is no data to ground
+    # them in. global_means (Lambda over every universe taking a combination) is
+    # the fallback counterfactual when nothing else about the background can be
+    # matched.
+    global_means <- summarize_groups(target_dims) |> rename(v_global = v)
+    combos <- global_means |> select(all_of(target_dims))
 
     # one realised outcome per (background context, combination of target_dims);
     # on duplicates the last one wins, as when building a dict in Python
@@ -325,12 +329,63 @@ decide <- function (
 
     contexts <- mv |> select(all_of(other_dims)) |> distinct()
 
-    # each background context gets a full comparable set, imputing the
-    # average-case outcome wherever that context never realised a combination
-    phi <- expand_grid(contexts, imputed |> select(all_of(target_dims))) |>
+    # sparsity handling in case different options exist depending on the
+    # background: a combination of target_dims that a background never
+    # realised is filled in with its matched average-case counterfactual --
+    # Lambda over the universes taking that combination which agree with the
+    # background on as many of the other judgment calls as possible, averaging
+    # only over the ones that block the comparison. E.g. with the universe
+    # (c1=1, c2=1, c3=0) and no c3=0 anywhere else, its counterpart for c2=2 is
+    # the average of (c1=1, c2=2, c3=x). If several equally large sets of
+    # judgment calls can be matched, their universes are pooled. This does not
+    # depend on the order of the judgment calls.
+    #
+    # All missing (background, combination) cells are matched at once, level by
+    # level: first on all but one of the other judgment calls, then on one
+    # fewer, and so on. A cell is resolved at the first level where any
+    # universes match it, and the matches of every way of choosing that many
+    # judgment calls are pooled before applying Lambda.
+    missing <- expand_grid(contexts, combos) |>
+      anti_join(realised, by = c(other_dims, target_dims)) |>
+      mutate(.cell = row_number())
+    matched <- tibble(.cell = integer(), v_matched = numeric())
+    unresolved <- missing
+    for (num_matched in rev(seq_len(length(other_dims) - 1))) {
+      # loop thru to find closest matching universes
+      if (nrow(unresolved) == 0) break
+      hits <- bind_rows(lapply(
+        combn(other_dims, num_matched, simplify = FALSE),
+        function (matched_dims) {
+          unresolved |>
+            select(.cell, all_of(c(target_dims, matched_dims))) |>
+            inner_join(
+              mv |> select(all_of(c(target_dims, matched_dims)), v = all_of(colname_metric)),
+              by = c(target_dims, matched_dims),
+              relationship = "many-to-many"
+            ) |>
+            select(.cell, v)
+        }
+      ))
+      if (nrow(hits) == 0) next
+      resolved <- hits |>
+        group_by(.cell) |>
+        summarise(v_matched = summary(v), .groups = "drop")
+      matched <- bind_rows(matched, resolved)
+      unresolved <- unresolved |> filter(!.cell %in% resolved$.cell)
+    }
+    # nothing about the background can be matched: fall back to the global value
+    filled <- missing |>
+      left_join(matched, by = ".cell") |>
+      left_join(global_means, by = target_dims) |>
+      mutate(v_filled = coalesce(v_matched, v_global)) |>
+      select(all_of(c(other_dims, target_dims)), v_filled)
+
+    # each background context gets a full comparable set: its realised outcomes,
+    # plus the matched counterfactuals for the combinations it never realised
+    phi <- expand_grid(contexts, combos) |>
       left_join(realised, by = c(other_dims, target_dims)) |>
-      left_join(imputed, by = target_dims) |>
-      mutate(v = coalesce(v, v_imputed)) |>
+      left_join(filled, by = c(other_dims, target_dims)) |>
+      mutate(v = coalesce(v, v_filled)) |>
       group_by(across(all_of(other_dims))) |>
       summarise(phi = spread(v), .groups = "drop")
 
@@ -363,6 +418,28 @@ decide <- function (
         call. = FALSE
       )
       return(c(list(total = NaN), shares))
+    }
+
+    # among the included backgrounds, count the combinations of target_dims that
+    # were filled in rather than realised
+    num_imputed <- missing |>
+      semi_join(phi[included, other_dims], by = other_dims) |>
+      nrow()
+    if (num_imputed > 0) {
+      # the multiverse is sparse for this specific subset: at least one
+      # background context was missing a real outcome for one of target_dims'
+      # choices, so total_effect partly relies on matched average-case
+      # counterfactuals rather than purely observed adjacent universes. This
+      # also means total_effect ~= main_effect + interaction_effect only holds
+      # approximately for this subset.
+      warning(
+        "total_effect for ", paste(target_dims, collapse = ", "), " used ",
+        num_imputed, " imputed average-case counterfactual value(s) across ",
+        sum(included), " background contexts (multiverse is ragged for this ",
+        "subset). total_effect ~= main_effect + interaction_effect will only ",
+        "hold approximately here.",
+        call. = FALSE
+      )
     }
 
     # aggregate the per-context spreads of the included backgrounds with Lambda
