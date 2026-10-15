@@ -195,7 +195,11 @@ naive_tree_based_importance <- function (mv, colname_metric, dim_prefix = "mv_di
 #   main_effect         GME(S) = Phi_{s_S}( Lambda_{p_{-S}}(f)): the "closed"
 #                       first-to-|S|-order effect of S -- how much the summarised
 #                       outcome moves as S's choices vary, aggregating over
-#                       everything else. (Var(E[Y|X_S]) by default.)
+#                       everything else. (Var(E[Y|X_S]) by default.) Universes in
+#                       background contexts that are left out of total_effect
+#                       (see exclude_inert and conditional_decisions) are left out
+#                       here too, so that both are computed over the same
+#                       universes.
 #   total_effect        DECIDE(S) = Lambda_{p_{-S}}(Phi(comparable set)): the
 #                       total effect of S -- the spread across S's choices within
 #                       each fixed background context, aggregated over contexts.
@@ -227,11 +231,26 @@ naive_tree_based_importance <- function (mv, colname_metric, dim_prefix = "mv_di
 # YRBS, combination when y_variable is a singleton). Identical results can also
 # happen by coincidence when the decision does apply (e.g. with discrete
 # outcomes), so by default (FALSE) these backgrounds are kept as zeros and only
-# reported through `inert_share`. Set to TRUE to calculate the importance only
-# over the backgrounds where the decision applies.
+# reported through `inert_share`. Set to TRUE to calculate the importances
+# (total and main) only over the backgrounds where the decision applies.
+#
+# `conditional_decisions`: judgment calls that only apply when other judgment
+# calls take certain options, as a named list mapping each such judgment call to
+# a named list of {other judgment call = options where it applies}. E.g. in MTF,
+# y_variable only varies for 5 of the 13 x_variables, so
+# list(mv_dim_y_variable = list(mv_dim_x_variable = c(<those 5 options>)))
+# declares that y_variable does not apply for the other 8. Background contexts
+# where a declared judgment call does not apply are left out of its importances
+# (total and main) instead of being compared against imputed counterfactuals.
+# Several conditions for one judgment call must all hold. For a subset S of
+# several judgment calls, a background is left out only if none of S's judgment
+# calls apply there; a declaration whose condition involves a judgment call in S
+# is ignored for S, since S's options are then compared jointly.
 #
 # Besides the scores, the result reports `applicability_share`, the proportion
-# of background contexts included in decide_total (NaN when it is 0), and
+# of background contexts included in decide_total (left out are inert
+# backgrounds if exclude_inert = TRUE, and backgrounds where a declared
+# conditional decision does not apply; decide_total is NaN when it is 0), and
 # `inert_share`, the proportion of background contexts where all options give
 # identical results. With Lambda = mean, decide_total * applicability_share
 # equals decide_total with the left-out backgrounds counted as zero.
@@ -250,7 +269,8 @@ decide <- function (
   summary = mean,
   report_all = FALSE,
   dim_prefix = "mv_dim_",
-  exclude_inert = FALSE
+  exclude_inert = FALSE,
+  conditional_decisions = NULL
 ) {
 
   # fix sparsity from functional dependence by merging decisions, if applicable
@@ -258,6 +278,42 @@ decide <- function (
   dims <- mv |> select(starts_with(dim_prefix)) |> colnames()
 
   if (is.null(max_order)) max_order <- length(dims)
+
+  # judgment calls that only apply when other judgment calls take certain
+  # options (declared by the user, see conditional_decisions above). for each,
+  # record whether it applies in every universe
+  if (is.null(conditional_decisions)) conditional_decisions <- list()
+  applies_in_universe <- list()
+  for (decision in names(conditional_decisions)) {
+    conditions <- conditional_decisions[[decision]]
+    for (name in c(decision, names(conditions))) {
+      if (!name %in% dims) {
+        stop(
+          "conditional_decisions refers to judgment call '", name, "', which ",
+          "is not in the multiverse (it may have been merged into another ",
+          "judgment call by check_and_merge_decisions()).",
+          call. = FALSE
+        )
+      }
+    }
+    for (condition_dim in names(conditions)) {
+      never_occur <- setdiff(
+        as.character(conditions[[condition_dim]]),
+        as.character(unique(mv[[condition_dim]]))
+      )
+      if (length(never_occur) > 0) {
+        stop(
+          "conditional_decisions: option(s) ", paste(never_occur, collapse = ", "),
+          " never occur for judgment call '", condition_dim, "'.",
+          call. = FALSE
+        )
+      }
+    }
+    applies_in_universe[[decision]] <- Reduce(`&`, lapply(
+      names(conditions),
+      \(c) as.character(mv[[c]]) %in% as.character(conditions[[c]])
+    ))
+  }
 
   # every non-empty subset of the judgment calls, smallest first
   subsets <- unlist(
@@ -267,33 +323,16 @@ decide <- function (
   subset_key <- \(target_dims) paste(target_dims, collapse = "\r")
   keys <- vapply(subsets, subset_key, character(1))
 
-  # Lambda applied within each group formed by `cols`, returning one summary
-  # value per group
-  summarize_groups <- function (cols) {
+  # Lambda applied within each group formed by `cols`, over the universes marked
+  # in the logical vector `used` (all universes by default), returning one
+  # summary value per group
+  summarize_groups <- function (cols, used = NULL) {
+    data <- if (is.null(used)) mv else mv[used, ]
     return(
-      mv |>
+      data |>
         group_by(across(all_of(cols))) |>
         summarise(v = summary(.data[[colname_metric]]), .groups = "drop")
     )
-  }
-
-  # --- main effects: Phi_{s_S}( Lambda_{p_{-S}}( f ) ) for every subset ---
-  main_effect <- setNames(
-    vapply(subsets, \(target_dims) spread(summarize_groups(target_dims)$v), numeric(1)),
-    keys
-  )
-
-  # --- pure marginal (Sobol) interaction ---
-  # interaction_effect(S) = main_effect(S) - sum over proper subsets T of S of
-  # interaction_effect(T). Because every proper subset of an S with
-  # |S| <= max_order is itself enumerated above, this is always well-defined.
-  interaction_effect <- setNames(numeric(length(subsets)), keys)
-  for (i in seq_along(subsets)) {
-    lower <- unlist(lapply(
-      seq_len(length(subsets[[i]]) - 1),
-      \(r) vapply(combn(subsets[[i]], r, simplify = FALSE), subset_key, character(1))
-    ))
-    interaction_effect[i] <- main_effect[i] - sum(interaction_effect[lower])
   }
 
   # --- total effects: sparse-multiverse-safe total effect of every subset ---
@@ -309,7 +348,8 @@ decide <- function (
       return(list(
         total = spread(mv[[colname_metric]]),
         applicability_share = 1,
-        inert_share = as.numeric(n_distinct(mv[[colname_metric]]) == 1)
+        inert_share = as.numeric(n_distinct(mv[[colname_metric]]) == 1),
+        used = rep(TRUE, nrow(mv))
       ))
     }
 
@@ -403,9 +443,46 @@ decide <- function (
     phi <- phi |> left_join(inert, by = other_dims)
     included <- if (exclude_inert) !phi$inert else rep(TRUE, nrow(phi))
 
+    # This addresses the case where a judgment call was declared to only apply
+    # when other judgment calls take certain options (see conditional_decisions):
+    # backgrounds where it does not apply are left out rather than compared
+    # against imputed counterfactuals. S applies wherever at least one of its
+    # judgment calls does; undeclared judgment calls always apply, and a
+    # declaration whose condition involves a judgment call in S is ignored, since
+    # S's options are then compared jointly. The result is constant within a
+    # background context, since every condition left refers only to judgment
+    # calls that the background fixes.
+    s_applies <- rep(FALSE, nrow(mv))
+    for (d in target_dims) {
+      conditions <- conditional_decisions[[d]]
+      if (is.null(conditions) || any(names(conditions) %in% target_dims)) {
+        s_applies[] <- TRUE
+        break
+      }
+      s_applies <- s_applies | applies_in_universe[[d]]
+    }
+    declared <- mv |>
+      select(all_of(other_dims)) |>
+      mutate(.applies = s_applies) |>
+      distinct(across(all_of(other_dims)), .keep_all = TRUE)
+    phi <- phi |> left_join(declared, by = other_dims)
+    included <- included & phi$.applies
+
+    # the universes of the included backgrounds, which the main effect is also
+    # computed over
+    used <- (
+      mv |>
+        select(all_of(other_dims)) |>
+        left_join(
+          phi |> mutate(.used = included) |> select(all_of(other_dims), .used),
+          by = other_dims
+        )
+    )$.used
+
     shares <- list(
       applicability_share = mean(included),
-      inert_share = mean(phi$inert)
+      inert_share = mean(phi$inert),
+      used = used
     )
 
     if (!any(included)) {
@@ -413,8 +490,9 @@ decide <- function (
       # estimate; refuse rather than guess
       warning(
         "total_effect for ", paste(target_dims, collapse = ", "), " is not ",
-        "estimable: it does not apply in any background context, so it is ",
-        "reported as NaN.",
+        "estimable: it does not apply in any background context (all are ",
+        "inert with exclude_inert = TRUE, or declared not to apply in ",
+        "conditional_decisions), so it is reported as NaN.",
         call. = FALSE
       )
       return(c(list(total = NaN), shares))
@@ -449,6 +527,31 @@ decide <- function (
   total_effect <- vapply(total_results, \(r) r$total, numeric(1))
   applicability_share <- vapply(total_results, \(r) r$applicability_share, numeric(1))
   inert_share <- vapply(total_results, \(r) r$inert_share, numeric(1))
+
+  # --- main effects: Phi_{s_S}( Lambda_{p_{-S}}( f ) ) for every subset ---
+  # computed over the same universes as the total effect, i.e. leaving out the
+  # background contexts where S does not apply (see the total effects above)
+  main_effect <- setNames(
+    vapply(seq_along(subsets), function (k) {
+      used <- total_results[[k]]$used
+      if (!any(used)) return(NaN)
+      spread(summarize_groups(subsets[[k]], used)$v)
+    }, numeric(1)),
+    keys
+  )
+
+  # --- pure marginal (Sobol) interaction ---
+  # interaction_effect(S) = main_effect(S) - sum over proper subsets T of S of
+  # interaction_effect(T). Because every proper subset of an S with
+  # |S| <= max_order is itself enumerated above, this is always well-defined.
+  interaction_effect <- setNames(numeric(length(subsets)), keys)
+  for (i in seq_along(subsets)) {
+    lower <- unlist(lapply(
+      seq_len(length(subsets[[i]]) - 1),
+      \(r) vapply(combn(subsets[[i]], r, simplify = FALSE), subset_key, character(1))
+    ))
+    interaction_effect[i] <- main_effect[i] - sum(interaction_effect[lower])
+  }
 
   total_spread <- spread(mv[[colname_metric]])
 
@@ -501,11 +604,12 @@ decide <- function (
 # vector is expected, e.g. vis_importance(), vis_importance_2dim(),
 # aggregate_onehot_importances(), or the ablation pipeline in R/ablation.R.
 decide_vec <- function (mv, colname_metric, dim_prefix = "mv_dim_",
-                        spread = pop_var, summary = mean, exclude_inert = FALSE) {
+                        spread = pop_var, summary = mean, exclude_inert = FALSE,
+                        conditional_decisions = NULL) {
   decide(
     mv, colname_metric,
     max_order = 1, spread = spread, summary = summary, dim_prefix = dim_prefix,
-    exclude_inert = exclude_inert
+    exclude_inert = exclude_inert, conditional_decisions = conditional_decisions
   ) |>
     (\(tbl) setNames(tbl$decide_total, tbl$dimension))()
 }
