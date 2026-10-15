@@ -117,7 +117,7 @@ vis_observed_vs_predicted <- function(reg_result, type = c("scatter", "hist", "k
 
     if (facet) {
       p <- p +
-        facet_wrap(~source) +
+        facet_wrap(~source, labeller=as_labeller(custom_labels)) +
         theme(
           legend.position = "none",
           strip.background = element_blank()  # Removes border around facet labels

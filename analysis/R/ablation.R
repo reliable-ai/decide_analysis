@@ -1,10 +1,34 @@
+# Restrict declared conditional decisions (see `conditional_decisions` in
+# decide()) to what still exists in `mv`. In an ablated multiverse, fixing a
+# decision removes its column: a declaration about it, or conditioned on it, no
+# longer applies (the declared decision then either applies everywhere or has a
+# single option and is removed too), so it is dropped. Options that no longer
+# occur are dropped from the remaining conditions.
+restrict_conditional_decisions <- function (conditional_decisions, mv) {
+  if (is.null(conditional_decisions)) return(NULL)
+  kept <- list()
+  for (decision in names(conditional_decisions)) {
+    conditions <- conditional_decisions[[decision]]
+    if (!all(c(decision, names(conditions)) %in% names(mv))) next
+    kept[[decision]] <- lapply(
+      setNames(names(conditions), names(conditions)),
+      \(c) intersect(as.character(conditions[[c]]), as.character(unique(mv[[c]])))
+    )
+  }
+  kept
+}
+
 # DECIDE main effect and total effect per decision, as two named numeric vectors
 # keyed by dimension name.
 calc_decide_importances <- function (mv, colname_metric, dim_prefix = "mv_dim_",
-                                     spread = pop_var, summary = mean) {
+                                     spread = pop_var, summary = mean,
+                                     exclude_inert = FALSE,
+                                     conditional_decisions = NULL) {
   decomposition <- decide(
     mv, colname_metric,
-    max_order = 1, spread = spread, summary = summary, dim_prefix = dim_prefix
+    max_order = 1, spread = spread, summary = summary, dim_prefix = dim_prefix,
+    exclude_inert = exclude_inert,
+    conditional_decisions = restrict_conditional_decisions(conditional_decisions, mv)
   )
 
   list(
@@ -34,12 +58,17 @@ calc_importance_methods <- function (mv, colname_metric, dim_prefix = "mv_dim_",
                                       regression_post_process = identity,
                                       fanova_mv_pre_process = identity,
                                       fanova_post_process = identity,
-                                      include_fanova_total = TRUE) {
+                                      include_fanova_total = TRUE,
+                                      exclude_inert = FALSE,
+                                      conditional_decisions = NULL) {
   if (is.null(post_process_importances)) {
     post_process_importances = function (x) { return(x) }
   }
 
-  decide_importances <- calc_decide_importances(mv, colname_metric, dim_prefix = dim_prefix)
+  decide_importances <- calc_decide_importances(
+    mv, colname_metric, dim_prefix = dim_prefix,
+    exclude_inert = exclude_inert, conditional_decisions = conditional_decisions
+  )
 
   fanova_mv <- fanova_mv_pre_process(mv)
 
@@ -189,7 +218,9 @@ calc_ablation_importance <- function (
   regression_post_process = identity,
   fanova_mv_pre_process = identity,
   fanova_post_process = identity,
-  include_fanova_total = TRUE
+  include_fanova_total = TRUE,
+  exclude_inert = FALSE,
+  conditional_decisions = NULL
 ) {
   ablation_grid <- build_ablation_grid(mv, prefixes = prefixes, dim_prefix = dim_prefix)
 
@@ -225,7 +256,9 @@ calc_ablation_importance <- function (
           regression_post_process = regression_post_process,
           fanova_mv_pre_process = fanova_mv_pre_process,
           fanova_post_process = fanova_post_process,
-          include_fanova_total = include_fanova_total
+          include_fanova_total = include_fanova_total,
+          exclude_inert = exclude_inert,
+          conditional_decisions = conditional_decisions
         ),
         dim_prefix = dim_prefix
       ) |>
@@ -363,6 +396,8 @@ run_ablation_analysis <- function (mv, colname_metric, dim_prefix = "mv_dim_", p
                                     fanova_mv_pre_process = identity,
                                     fanova_post_process = identity,
                                     include_fanova_total = TRUE,
+                                    exclude_inert = FALSE,
+                                    conditional_decisions = NULL,
                                     cor_method = "spearman") {
   # Baseline: importances computed on the full multiverse (no fixed decision).
   baseline_importance <- tidy_importance_methods(
@@ -375,7 +410,9 @@ run_ablation_analysis <- function (mv, colname_metric, dim_prefix = "mv_dim_", p
       regression_post_process = regression_post_process,
       fanova_mv_pre_process = fanova_mv_pre_process,
       fanova_post_process = fanova_post_process,
-      include_fanova_total = include_fanova_total
+      include_fanova_total = include_fanova_total,
+      exclude_inert = exclude_inert,
+      conditional_decisions = conditional_decisions
     ),
     dim_prefix = dim_prefix
   )
@@ -391,7 +428,9 @@ run_ablation_analysis <- function (mv, colname_metric, dim_prefix = "mv_dim_", p
     regression_post_process = regression_post_process,
     fanova_mv_pre_process = fanova_mv_pre_process,
     fanova_post_process = fanova_post_process,
-    include_fanova_total = include_fanova_total
+    include_fanova_total = include_fanova_total,
+    exclude_inert = exclude_inert,
+    conditional_decisions = conditional_decisions
   )
 
   # Add the full-multiverse baseline as a reference pseudo-setting so method
