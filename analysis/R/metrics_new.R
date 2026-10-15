@@ -220,10 +220,26 @@ naive_tree_based_importance <- function (mv, colname_metric, dim_prefix = "mv_di
 # pass a larger value, or NULL for the full power set, to also get interaction
 # effects up to that order.
 #
-# Returns a tibble with one row per subset and columns `dimensions` (a
-# list-column of dimension names), `order`, `var_total`, `main_effect`,
-# `total_effect` and `interaction_effect`, the last of which is NA for subsets
-# with |S| == 1 (see interaction_effect above).
+# `exclude_inert`: some decisions do not apply in certain backgrounds but are
+# still listed there, so all of their options give identical results (e.g. in
+# YRBS, combination when y_variable is a singleton). Identical results can also
+# happen by coincidence when the decision does apply (e.g. with discrete
+# outcomes), so by default (FALSE) these backgrounds are kept as zeros and only
+# reported through `inert_share`. Set to TRUE to calculate the importance only
+# over the backgrounds where the decision applies.
+#
+# Besides the scores, the result reports `applicability_share`, the proportion
+# of background contexts included in decide_total (NaN when it is 0), and
+# `inert_share`, the proportion of background contexts where all options give
+# identical results. With Lambda = mean, decide_total * applicability_share
+# equals decide_total with the left-out backgrounds counted as zero.
+#
+# Returns a tibble with one row per subset and columns `dimension` (the judgment
+# call's name, or the names of a subset's judgment calls joined with " + "),
+# `decide_total`, `decide_main`, `ratio_main`, `applicability_share` and
+# `inert_share`, plus `share_var_total` when Phi = variance and Lambda = mean.
+# With `report_all = TRUE` it also includes `decide_interactions`,
+# `ratio_interactions` and `total_spread`.
 decide <- function (
   mv,
   colname_metric,
@@ -231,7 +247,8 @@ decide <- function (
   spread = pop_var,
   summary = mean,
   report_all = FALSE,
-  dim_prefix = "mv_dim_"
+  dim_prefix = "mv_dim_",
+  exclude_inert = FALSE
 ) {
 
   # fix sparsity from functional dependence by merging decisions, if applicable
@@ -277,14 +294,21 @@ decide <- function (
     interaction_effect[i] <- main_effect[i] - sum(interaction_effect[lower])
   }
 
-  # --- total effects: ragged-tree safe total effect of every subset ---
-  total_effect <- vapply(subsets, function (target_dims) {
+  # --- total effects: sparse-multiverse-safe total effect of every subset ---
+  # each subset gets its total effect and the proportions of background contexts
+  # that were included in it (applicability_share) and that are inert
+  # (inert_share; see exclude_inert)
+  total_results <- lapply(subsets, function (target_dims) {
     other_dims <- setdiff(dims, target_dims)
 
     if (length(other_dims) == 0) {
       # target_dims covers every decision: one background context (the whole
       # multiverse), every combination of target_dims is real
-      return(spread(mv[[colname_metric]]))
+      return(list(
+        total = spread(mv[[colname_metric]]),
+        applicability_share = 1,
+        inert_share = as.numeric(n_distinct(mv[[colname_metric]]) == 1)
+      ))
     }
 
     # average-case counterfactual for every combination of target_dims' choices
@@ -310,22 +334,61 @@ decide <- function (
       group_by(across(all_of(other_dims))) |>
       summarise(phi = spread(v), .groups = "drop")
 
-    # aggregate the per-context spreads with Lambda (equal weight per background
-    # context by default)
-    return(summary(phi$phi))
-  }, numeric(1))
+    # This addresses the case where the decision doesn't apply in some
+    # backgrounds, but is still listed there (thus, there is no difference in
+    # the downstream results across its options): a background where
+    # target_dims has at least two options listed, but they all give the same
+    # result. This can also happen by coincidence if a decision just doesn't
+    # matter, so we only report this proportion by default, and leave these
+    # backgrounds out if the user asks to exclude them (recommended if they
+    # know a priori that the decision doesn't apply in some backgrounds).
+    inert <- realised |>
+      group_by(across(all_of(other_dims))) |>
+      summarise(inert = n() >= 2 & n_distinct(v) == 1, .groups = "drop")
+    phi <- phi |> left_join(inert, by = other_dims)
+    included <- if (exclude_inert) !phi$inert else rep(TRUE, nrow(phi))
+
+    shares <- list(
+      applicability_share = mean(included),
+      inert_share = mean(phi$inert)
+    )
+
+    if (!any(included)) {
+      # target_dims does not apply in any background, so there is nothing to
+      # estimate; refuse rather than guess
+      warning(
+        "total_effect for ", paste(target_dims, collapse = ", "), " is not ",
+        "estimable: it does not apply in any background context, so it is ",
+        "reported as NaN.",
+        call. = FALSE
+      )
+      return(c(list(total = NaN), shares))
+    }
+
+    # aggregate the per-context spreads of the included backgrounds with Lambda
+    # (each included background context contributes one value)
+    return(c(list(total = summary(phi$phi[included])), shares))
+  })
+  total_effect <- vapply(total_results, \(r) r$total, numeric(1))
+  applicability_share <- vapply(total_results, \(r) r$applicability_share, numeric(1))
+  inert_share <- vapply(total_results, \(r) r$inert_share, numeric(1))
 
   total_spread <- spread(mv[[colname_metric]])
 
   results <- tibble(
-    dimension = subsets |> unlist(),
+    # one label per subset; for subsets of several judgment calls, their names
+    # joined with " + " (single judgment calls keep their plain name)
+    dimension = vapply(subsets, \(target_dims) paste(target_dims, collapse = " + "), character(1)),
     decide_total = unname(total_effect),
     decide_main = unname(main_effect),
     decide_interactions = unname(interaction_effect),
 
     ratio_main = decide_main / decide_total,
     ratio_interactions = interaction_effect / decide_total,
-    total_spread = total_spread
+    total_spread = total_spread,
+
+    applicability_share = applicability_share,
+    inert_share = inert_share
   )
 
   # Default scores to report
@@ -333,7 +396,9 @@ decide <- function (
     "dimension",
     "decide_total",
     "decide_main",
-    "ratio_main"
+    "ratio_main",
+    "applicability_share",
+    "inert_share"
   )
   if (!report_all) {
     # If report_all isn't set, report only the most important scores
@@ -359,10 +424,11 @@ decide <- function (
 # vector is expected, e.g. vis_importance(), vis_importance_2dim(),
 # aggregate_onehot_importances(), or the ablation pipeline in R/ablation.R.
 decide_vec <- function (mv, colname_metric, dim_prefix = "mv_dim_",
-                        spread = pop_var, summary = mean) {
+                        spread = pop_var, summary = mean, exclude_inert = FALSE) {
   decide(
     mv, colname_metric,
-    max_order = 1, spread = spread, summary = summary, dim_prefix = dim_prefix
+    max_order = 1, spread = spread, summary = summary, dim_prefix = dim_prefix,
+    exclude_inert = exclude_inert
   ) |>
     (\(tbl) setNames(tbl$decide_total, tbl$dimension))()
 }
