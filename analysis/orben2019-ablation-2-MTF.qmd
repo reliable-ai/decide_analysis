@@ -4,7 +4,8 @@ format: pdf
 ---
 
 ```{r setup}
-source("R/_load.R")
+here::i_am("orben2019-ablation-2-MTF.qmd")
+source(here::here("R", "_load.R"))
 ```
 
 This document contains the ablation study for the MTF multiverse dataset from
@@ -39,6 +40,16 @@ only be -1 or +1. `decide_main` and `decide_total` therefore always agree.
 TODO: Double check the validity of this multiverse's analysis, manye more things break here than in the others. For practical reasons this one also disables the total.
 
 ```{r mtf-ablation-run}
+
+# y_variable only varies for the x_variables that were run with several
+# y_variables (5 of 13); for the other 8 it does not apply
+full_x <- mv_mtf |>
+  distinct(mv_dim_x_variable, mv_dim_y_variable) |>
+  count(mv_dim_x_variable) |>
+  filter(n > 1) |>
+  pull(mv_dim_x_variable) |>
+  as.character()
+
 ablation_mtf <- run_ablation_analysis(
   mv_mtf,
   colname_metric = "effect",
@@ -47,7 +58,10 @@ ablation_mtf <- run_ablation_analysis(
   fanova_mv_pre_process = expand_y_variable,
   fanova_post_process = aggregate_onehot_importances,
   include_fanova_total = FALSE,
-  cor_method = "pearson"
+  cor_method = "pearson",
+  conditional_decisions = list(
+    mv_dim_y_variable = list(mv_dim_x_variable = full_x)
+  )
 )
 ```
 

@@ -46,7 +46,7 @@ mv_yrbs
 DECIDE default score
 
 ```{r yrbs-between-bucket}
-decide_yrbs <- decide_vec(mv_yrbs, colname_metric = "effect")
+decide_yrbs <- decide_vec(mv_yrbs, colname_metric = "effect", exclude_inert=TRUE)
 decide_yrbs
 ```
 
@@ -61,7 +61,8 @@ decide_range_max_yrbs <- decide_vec(
   mv_yrbs,
   colname_metric = "effect",
   spread = function(x) { diff(range(x)) },
-  summary = max
+  summary = max,
+  exclude_inert=TRUE
 )
 decide_range_max_yrbs
 ```

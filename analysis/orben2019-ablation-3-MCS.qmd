@@ -4,7 +4,8 @@ format: pdf
 ---
 
 ```{r setup}
-source("R/_load.R")
+here::i_am("orben2019-ablation-3-MCS.qmd")
+source(here::here("R", "_load.R"))
 ```
 
 This document contains the ablation study for the MCS Total multiverse dataset

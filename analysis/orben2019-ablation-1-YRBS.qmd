@@ -4,7 +4,8 @@ format: pdf
 ---
 
 ```{r setup}
-source("R/_load.R")
+here::i_am("orben2019-ablation-1-YRBS.qmd")
+source(here::here("R", "_load.R"))
 ```
 
 This document contains the ablation study for the YRBS multiverse dataset from
@@ -33,7 +34,8 @@ ablation_yrbs <- run_ablation_analysis(
   regression_post_process = aggregate_onehot_importances,
   fanova_mv_pre_process = expand_y_variable,
   fanova_post_process = aggregate_onehot_importances,
-  cor_method = "pearson"
+  cor_method = "pearson",
+  exclude_inert = TRUE
 )
 ```
 

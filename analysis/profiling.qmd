@@ -20,13 +20,17 @@ N_RUNS <- 3
 profile_multiverse <- function (mv, colname_metric,
                                 model_pre_process = identity,
                                 include_fanova_total = TRUE,
+                                decide_args = list(),
                                 n_runs = 3) {
   model_mv <- model_pre_process(mv)
 
   runners <- list(
     regression  = function () calc_regression_importance(model_mv, colname_metric),
     fanova_main = function () calc_fanova_main_importance(model_mv, colname_metric),
-    decide      = function () calc_decide_importances(mv, colname_metric)
+    # DECIDE with the same settings as the paper's results
+    decide      = function () do.call(
+      calc_decide_importances, c(list(mv, colname_metric), decide_args)
+    )
   )
 
   if (include_fanova_total) {
@@ -75,13 +79,23 @@ multiverses <- list(
 
 multiverse_levels <- names(multiverses)
 
+# MTF: y_variable only varies for the x_variables that were run with several
+# y_variables; for the others it does not apply (as in the MTF ablation qmd)
+mtf_full_x <- multiverses$MTF |>
+  distinct(mv_dim_x_variable, mv_dim_y_variable) |>
+  count(mv_dim_x_variable) |>
+  filter(n > 1) |>
+  pull(mv_dim_x_variable) |>
+  as.character()
+
+# decide_args: DECIDE settings matching the paper's results
 specs <- tibble::tribble(
-  ~multiverse,        ~colname_metric,          ~model_pre_process,   ~include_fanova_total,
-  "Fertility",        "fertility_low_estimate", "identity",           TRUE,
-  "Hurricane",        "expected_deaths_diff",   "identity",           TRUE,
-  "YRBS",       "effect",                 "expand_y_variable",  TRUE,
-  "MTF",        "effect",                 "expand_y_variable",  FALSE,
-  "MCS",  "effect",                 "expand_y_variable",  FALSE
+  ~multiverse,        ~colname_metric,          ~model_pre_process,   ~include_fanova_total, ~decide_args,
+  "Fertility",        "fertility_low_estimate", "identity",           TRUE,                  list(),
+  "Hurricane",        "expected_deaths_diff",   "identity",           TRUE,                  list(),
+  "YRBS",       "effect",                 "expand_y_variable",  TRUE,                  list(exclude_inert = TRUE),
+  "MTF",        "effect",                 "expand_y_variable",  FALSE,                 list(conditional_decisions = list(mv_dim_y_variable = list(mv_dim_x_variable = mtf_full_x))),
+  "MCS",  "effect",                 "expand_y_variable",  FALSE,                 list()
 )
 ```
 
@@ -108,12 +122,13 @@ mv_meta |>
 #| warning: false
 profiling_results <- specs |>
   pmap_dfr(function (multiverse, colname_metric, model_pre_process,
-                     include_fanova_total) {
+                     include_fanova_total, decide_args) {
     profile_multiverse(
       multiverses[[multiverse]],
       colname_metric = colname_metric,
       model_pre_process = get(model_pre_process),
       include_fanova_total = include_fanova_total,
+      decide_args = decide_args,
       n_runs = N_RUNS
     ) |>
       mutate(multiverse = multiverse, .before = 1)

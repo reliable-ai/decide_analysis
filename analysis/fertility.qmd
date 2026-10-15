@@ -4,7 +4,8 @@ format: pdf
 ---
 
 ```{r setup}
-source("R/_load.R")
+here::i_am("fertility.qmd")
+source(here::here("R", "_load.R"))
 ```
 
 ```{r fertility-load-data}

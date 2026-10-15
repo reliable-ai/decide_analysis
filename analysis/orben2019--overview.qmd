@@ -212,12 +212,12 @@ fanova_yrbs |>
 ## Our Framework
 
 ```{r yrbs-decide}
-decide_yrbs <- decide(mv_yrbs, colname_metric = "effect")
+decide_yrbs <- decide(mv_yrbs, colname_metric = "effect", exclude_inert=TRUE)
 decide_yrbs
 ```
 
 ```{r yrbs-decide-plot}
-decide_vec_yrbs <- decide_vec(mv_yrbs, colname_metric = "effect")
+decide_vec_yrbs <- decide_vec(mv_yrbs, colname_metric = "effect", exclude_inert=TRUE)
 vis_importance(decide_vec_yrbs)
 ```
 
