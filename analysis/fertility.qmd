@@ -212,9 +212,17 @@ ablation_fert$inter_method_stability_summary |>
 ```
 
 ```{r fertility-ablation-inter-method-plot}
-#| fig-width: 6
-#| fig-height: 4.5
-vis_inter_method_stability(ablation_fert$inter_method_stability_summary)
+#| fig-width: 3.2
+#| fig-height: 4
+# same row order in the inter- and intra-method heatmaps
+decision_order_fert <- stability_decision_order(ablation_fert$intra_method_stability_summary)
+p <- vis_inter_method_stability(
+  ablation_fert$inter_method_stability_summary,
+  decision_order = decision_order_fert,
+  value_size = 1.6
+) + theme_stability_compact()
+p
+ggsave(here("figures", "fertility-ablation-inter-method.pdf"), p, width = 3.2, height = 4, create.dir = TRUE)
 ```
 
 ## Intra-method stability
@@ -235,7 +243,15 @@ ablation_fert$intra_method_stability_summary |>
 ```
 
 ```{r fertility-ablation-intra-method-plot}
-vis_intra_method_stability(ablation_fert$intra_method_stability_summary)
+#| fig-width: 3.2
+#| fig-height: 4
+p <- vis_intra_method_stability(
+  ablation_fert$intra_method_stability_summary,
+  decision_order = decision_order_fert,
+  value_size = 1.6
+) + theme_stability_compact()
+p
+ggsave(here("figures", "fertility-ablation-intra-method.pdf"), p, width = 3.2, height = 4, create.dir = TRUE)
 ```
 
 

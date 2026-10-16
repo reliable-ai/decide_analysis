@@ -2,7 +2,8 @@ vis_decision <- function(mv, decision, colname_metric, facet = FALSE,
                          type = c("hist", "kde"), dim_prefix = "mv_dim_") {
   type <- match.arg(type)
   decision <- enquo(decision)
-  decision_label <- sub(paste0("^", dim_prefix), "", as_label(decision))
+  # display names from R/nicknames.R
+  decision_label <- nn(sub(paste0("^", dim_prefix), "", as_label(decision)))
 
   p <- ggplot(mv, aes(
     x = .data[[colname_metric]],
@@ -21,7 +22,7 @@ vis_decision <- function(mv, decision, colname_metric, facet = FALSE,
   }
 
   p +
-    labs(fill = decision_label, colour = decision_label, x = colname_metric) +
+    labs(fill = decision_label, colour = decision_label, x = nn(colname_metric)) +
     theme_classic()
 }
 
@@ -31,8 +32,9 @@ vis_two_decisions <- function(mv, decision1, decision2, colname_metric,
   type <- match.arg(type)
   decision1 <- enquo(decision1)
   decision2 <- enquo(decision2)
-  label1 <- sub(paste0("^", dim_prefix), "", as_label(decision1))
-  label2 <- sub(paste0("^", dim_prefix), "", as_label(decision2))
+  # display names from R/nicknames.R
+  label1 <- nn(sub(paste0("^", dim_prefix), "", as_label(decision1)))
+  label2 <- nn(sub(paste0("^", dim_prefix), "", as_label(decision2)))
 
   if (facet) {
     p <- ggplot(mv, aes(
@@ -62,7 +64,7 @@ vis_two_decisions <- function(mv, decision1, decision2, colname_metric,
     p <- p + facet_grid(rows = vars(!!decision1), cols = vars(!!decision2))
   }
 
-  p <- p + labs(fill = aes_label, colour = aes_label, x = colname_metric)
+  p <- p + labs(fill = aes_label, colour = aes_label, x = nn(colname_metric))
 
   p + theme_classic()
 }

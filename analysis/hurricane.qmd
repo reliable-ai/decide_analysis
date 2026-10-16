@@ -214,9 +214,17 @@ ablation_hurr$inter_method_stability_summary |>
 ```
 
 ```{r hurricane-ablation-inter-method-plot}
-#| fig-width: 6
-#| fig-height: 4.5
-vis_inter_method_stability(ablation_hurr$inter_method_stability_summary)
+#| fig-width: 3.2
+#| fig-height: 4
+# same row order in the inter- and intra-method heatmaps
+decision_order_hurr <- stability_decision_order(ablation_hurr$intra_method_stability_summary)
+p <- vis_inter_method_stability(
+  ablation_hurr$inter_method_stability_summary,
+  decision_order = decision_order_hurr,
+  value_size = 1.6
+) + theme_stability_compact()
+p
+ggsave(here("figures", "hurricane-ablation-inter-method.pdf"), p, width = 3.2, height = 4, create.dir = TRUE)
 ```
 
 ## Intra-method stability
@@ -237,6 +245,14 @@ ablation_hurr$intra_method_stability_summary |>
 ```
 
 ```{r hurricane-ablation-intra-method-plot}
-vis_intra_method_stability(ablation_hurr$intra_method_stability_summary)
+#| fig-width: 3.2
+#| fig-height: 4
+p <- vis_intra_method_stability(
+  ablation_hurr$intra_method_stability_summary,
+  decision_order = decision_order_hurr,
+  value_size = 1.6
+) + theme_stability_compact()
+p
+ggsave(here("figures", "hurricane-ablation-intra-method.pdf"), p, width = 3.2, height = 4, create.dir = TRUE)
 ```
 

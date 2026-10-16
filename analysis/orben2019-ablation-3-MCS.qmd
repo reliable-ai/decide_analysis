@@ -63,13 +63,19 @@ ablation_mcs$inter_method_stability_summary |>
 ```
 
 ```{r mcs-ablation-inter-method-plot}
-#| fig-width: 6
-#| fig-height: 4.5
-vis_inter_method_stability(
+#| fig-width: 3.2
+#| fig-height: 4
+# same row order in the inter- and intra-method heatmaps
+decision_order_mcs <- stability_decision_order(ablation_mcs$intra_method_stability_summary)
+p <- vis_inter_method_stability(
   ablation_mcs$inter_method_stability_summary,
   fill_label = "Mean Pearson\ncorrelation",
-  fill_option = "plasma"
-)
+  fill_option = "plasma",
+  decision_order = decision_order_mcs,
+  value_size = 1.6
+) + theme_stability_compact()
+p
+ggsave(here("figures", "mcs-ablation-inter-method.pdf"), p, width = 3.2, height = 4, create.dir = TRUE)
 ```
 
 ### Intra-method stability
@@ -86,9 +92,15 @@ ablation_mcs$intra_method_stability_summary |>
 ```
 
 ```{r mcs-ablation-intra-method-plot}
-vis_intra_method_stability(
+#| fig-width: 3.2
+#| fig-height: 4
+p <- vis_intra_method_stability(
   ablation_mcs$intra_method_stability_summary,
   fill_label = "Mean Pearson\ncorrelation",
-  fill_option = "cividis"
-)
+  fill_option = "cividis",
+  decision_order = decision_order_mcs,
+  value_size = 1.6
+) + theme_stability_compact()
+p
+ggsave(here("figures", "mcs-ablation-intra-method.pdf"), p, width = 3.2, height = 4, create.dir = TRUE)
 ```

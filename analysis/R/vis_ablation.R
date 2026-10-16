@@ -14,12 +14,27 @@ add_stability_average_row <- function (stability_summary,
   )
 }
 
+# Order of the decision rows in the stability heatmaps: by mean correlation
+# across methods (or method pairs), lowest first, so that the most stable
+# decisions sit at the top. Returns the decisions' fixed_decision_label values.
+# Pass the result as `decision_order` to both heatmaps so their rows line up.
+stability_decision_order <- function (stability_summary) {
+  stability_summary |>
+    filter(fixed_decision != "full_multiverse") |>
+    group_by(fixed_decision_label) |>
+    summarise(order_value = safe_mean(mean_rank_correlation), .groups = "drop") |>
+    arrange(order_value) |>
+    pull(fixed_decision_label)
+}
+
 vis_inter_method_stability <- function (inter_method_stability_summary,
-                                        baseline_label = "full multiverse",
+                                        baseline_label = "Full Multiverse",
                                         show_values = TRUE,
                                         add_average = TRUE,
                                         fill_label = "Mean rank\ncorrelation",
-                                        fill_option = "viridis") {
+                                        fill_option = "viridis",
+                                        decision_order = NULL,
+                                        value_size = 3) {
   plot_data <- inter_method_stability_summary |>
     mutate(
       # order the two methods within each pair canonically, so that e.g.
@@ -45,15 +60,11 @@ vis_inter_method_stability <- function (inter_method_stability_summary,
     plot_data <- add_stability_average_row(plot_data, group_cols = "comparison")
   }
 
-  decision_order <- plot_data |>
-    filter(
-      fixed_decision_label != "Average",
-      fixed_decision_label != baseline_label
-    ) |>
-    group_by(fixed_decision_label) |>
-    summarise(order_value = safe_mean(mean_rank_correlation), .groups = "drop") |>
-    arrange(order_value) |>
-    pull(fixed_decision_label)
+  # rows follow `decision_order` if given (e.g. to match the intra-method
+  # heatmap), otherwise this heatmap's own mean correlations
+  if (is.null(decision_order)) {
+    decision_order <- stability_decision_order(inter_method_stability_summary)
+  }
 
   # full multiverse row always sits at the top of the heatmap (last level = top of y-axis)
   decision_order <- c(decision_order, baseline_label)
@@ -65,11 +76,15 @@ vis_inter_method_stability <- function (inter_method_stability_summary,
   plot_data <- plot_data |>
     mutate(
       comparison = factor(comparison, levels = unique(comparison_order)),
-      fixed_decision_label = factor(fixed_decision_label, levels = unique(decision_order)),
+      fixed_decision_label = factor(fixed_decision_label, levels = unique(decision_order)) |>
+        # display names from R/nicknames.R, keeping the row order
+        fct_relabel(nn),
       correlation_label = if_else(
         is.na(mean_rank_correlation),
         "NA",
-        formatC(mean_rank_correlation, digits = 2, format = "f")
+        # round first and add 0, so that values rounding to zero from below
+        # show as 0.00 rather than -0.00
+        formatC(round(mean_rank_correlation, 2) + 0, digits = 2, format = "f")
       ),
       label_color = if_else(
         !is.na(mean_rank_correlation) & mean_rank_correlation < -0.5,
@@ -89,7 +104,7 @@ vis_inter_method_stability <- function (inter_method_stability_summary,
     theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
   if (show_values) {
-    plot <- plot + geom_text(aes(label = correlation_label, color = label_color), size = 3) +
+    plot <- plot + geom_text(aes(label = correlation_label, color = label_color), size = value_size) +
       scale_color_identity()
   }
 
@@ -104,19 +119,20 @@ vis_intra_method_stability <- function (intra_method_stability_summary,
                                         show_values = TRUE,
                                         add_average = TRUE,
                                         fill_label = "Mean rank\ncorrelation",
-                                        fill_option = "mako") {
+                                        fill_option = "mako",
+                                        decision_order = NULL,
+                                        value_size = 3) {
   plot_data <- intra_method_stability_summary
 
   if (add_average) {
     plot_data <- add_stability_average_row(plot_data, group_cols = "method")
   }
 
-  decision_order <- plot_data |>
-    filter(fixed_decision_label != "Average") |>
-    group_by(fixed_decision_label) |>
-    summarise(order_value = safe_mean(mean_rank_correlation), .groups = "drop") |>
-    arrange(order_value) |>
-    pull(fixed_decision_label)
+  # rows follow `decision_order` if given (e.g. to match the inter-method
+  # heatmap), otherwise this heatmap's own mean correlations
+  if (is.null(decision_order)) {
+    decision_order <- stability_decision_order(intra_method_stability_summary)
+  }
 
   if (add_average) {
     decision_order <- c("Average", decision_order)
@@ -126,11 +142,15 @@ vis_intra_method_stability <- function (intra_method_stability_summary,
     mutate(
       # methods on the x-axis follow the canonical method order
       method_label = factor_method_labels(method),
-      fixed_decision_label = factor(fixed_decision_label, levels = unique(decision_order)),
+      fixed_decision_label = factor(fixed_decision_label, levels = unique(decision_order)) |>
+        # display names from R/nicknames.R, keeping the row order
+        fct_relabel(nn),
       correlation_label = if_else(
         is.na(mean_rank_correlation),
         "NA",
-        formatC(mean_rank_correlation, digits = 2, format = "f")
+        # round first and add 0, so that values rounding to zero from below
+        # show as 0.00 rather than -0.00
+        formatC(round(mean_rank_correlation, 2) + 0, digits = 2, format = "f")
       ),
       label_color = if_else(
         !is.na(mean_rank_correlation) & mean_rank_correlation < -0.5,
@@ -154,7 +174,7 @@ vis_intra_method_stability <- function (intra_method_stability_summary,
     theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
   if (show_values) {
-    plot <- plot + geom_text(aes(label = correlation_label, color = label_color), size = 3) +
+    plot <- plot + geom_text(aes(label = correlation_label, color = label_color), size = value_size) +
       scale_color_identity()
   }
 
@@ -163,6 +183,29 @@ vis_intra_method_stability <- function (intra_method_stability_summary,
   }
 
   plot
+}
+
+# Compact styling for the stability heatmaps as small paper figures (e.g. two
+# side by side at 3.2in wide): smaller text, multi-word decision names wrapped
+# onto separate lines, and a slim colour legend at the side. The extra left
+# margin leaves room for the first (rotated) x-axis label. Use together with
+# `value_size = 1.6` in the heatmap functions.
+theme_stability_compact <- function () {
+  list(
+    theme(
+      text = element_text(size = 7),
+      axis.text = element_text(size = 6.5),
+      legend.position = "right",
+      legend.title = element_text(size = 6),
+      legend.text = element_text(size = 5.5),
+      legend.key.width = unit(0.08, "in"),
+      legend.key.height = unit(0.22, "in"),
+      legend.margin = margin(0, 0, 0, 0),
+      legend.box.spacing = unit(0.05, "in"),
+      plot.margin = margin(2, 2, 2, 22)
+    ),
+    scale_y_discrete(labels = scales::label_wrap(10))
+  )
 }
 
 vis_method_stability <- vis_inter_method_stability
