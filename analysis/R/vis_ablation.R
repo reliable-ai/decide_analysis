@@ -187,10 +187,11 @@ vis_intra_method_stability <- function (intra_method_stability_summary,
 
 # Compact styling for the stability heatmaps as small paper figures (e.g. two
 # side by side at 3.2in wide): smaller text, multi-word decision names wrapped
-# onto separate lines, and a slim colour legend at the side. The extra left
-# margin leaves room for the first (rotated) x-axis label. Use together with
-# `value_size = 1.6` in the heatmap functions.
-theme_stability_compact <- function () {
+# onto separate lines, and a slim colour legend at the side. Use together with
+# `value_size = 1.6` in the heatmap functions. `left_margin` (in points) leaves
+# room for the first rotated x-axis label when it is wider than the decision
+# names, e.g. the long method pairs of the inter-method heatmap (use 22 there).
+theme_stability_compact <- function (left_margin = 2) {
   list(
     theme(
       text = element_text(size = 7),
@@ -202,7 +203,7 @@ theme_stability_compact <- function () {
       legend.key.height = unit(0.22, "in"),
       legend.margin = margin(0, 0, 0, 0),
       legend.box.spacing = unit(0.05, "in"),
-      plot.margin = margin(2, 2, 2, 22)
+      plot.margin = margin(2, 2, 2, left_margin)
     ),
     scale_y_discrete(labels = scales::label_wrap(10))
   )

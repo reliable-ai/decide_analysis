@@ -96,7 +96,7 @@ p <- vis_inter_method_stability(
   fill_option = "plasma",
   decision_order = decision_order_mtf,
   value_size = 1.6
-) + theme_stability_compact()
+) + theme_stability_compact(left_margin = 22)
 p
 ggsave(here("figures", "mtf-ablation-inter-method.pdf"), p, width = 3.2, height = 4, create.dir = TRUE)
 ```
