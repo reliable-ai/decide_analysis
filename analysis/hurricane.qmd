@@ -67,7 +67,9 @@ reg_hurr |>
 ```{r hurricane-regression-residuals-fitted}
 #| fig-height: 3
 #| fig-width: 4.5
-vis_residuals_vs_fitted(reg_hurr)
+p <- vis_residuals_vs_fitted(reg_hurr)
+p
+ggsave(here("figures", "hurricane-regression-residuals-fitted.pdf"), p, width = 4.5, height = 3, create.dir = TRUE)
 ```
 
 ```{r hurricane-regression-observed-predicted}
@@ -88,8 +90,10 @@ vis_observed_vs_predicted(reg_hurr, type = "hist") +
 ```{r hurricane-regression-observed-predicted-hist}
 #| fig-height: 4
 #| fig-width: 12
-vis_observed_vs_predicted(reg_hurr, type = "hist", facet = T) +
+p <- vis_observed_vs_predicted(reg_hurr, type = "hist", facet = T) +
   labs(x = nn("expected_deaths_diff"))
+p
+ggsave(here("figures", "hurricane-regression-observed-predicted-hist.pdf"), p, width = 12, height = 4, create.dir = TRUE)
 ```
 
 ### Coefficients

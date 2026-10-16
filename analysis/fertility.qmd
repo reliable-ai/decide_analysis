@@ -70,7 +70,9 @@ reg_fert |>
 ```{r fertility-regression-residuals-fitted}
 #| fig-height: 3
 #| fig-width: 4.5
-vis_residuals_vs_fitted(reg_fert)
+p <- vis_residuals_vs_fitted(reg_fert)
+p
+ggsave(here("figures", "fertility-regression-residuals-fitted.pdf"), p, width = 4.5, height = 3, create.dir = TRUE)
 ```
 
 ```{r fertility-regression-observed-predicted}
@@ -90,8 +92,10 @@ vis_observed_vs_predicted(reg_fert, type = "hist") +
 ```{r fertility-regression-observed-predicted-hist}
 #| fig-height: 4
 #| fig-width: 12
-vis_observed_vs_predicted(reg_fert, type = "hist", facet = T) +
+p <- vis_observed_vs_predicted(reg_fert, type = "hist", facet = T) +
   labs(x = nn("fertility_low_estimate"))
+p
+ggsave(here("figures", "fertility-regression-observed-predicted-hist.pdf"), p, width = 12, height = 4, create.dir = TRUE)
 ```
 
 ```{r fertility-regression-coefficients}

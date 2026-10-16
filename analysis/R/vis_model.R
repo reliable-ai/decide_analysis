@@ -9,7 +9,7 @@ vis_residuals_vs_fitted <- function(reg_result) {
     geom_hline(yintercept = 0, linetype = "dashed", colour = "grey50") +
     geom_point(alpha = 0.6) +
     geom_smooth(method = "loess", se = FALSE, colour = col_fitted_line) +
-    labs(x = "Fitted values", y = "Residuals") +
+    labs(x = "Fitted Values", y = "Residuals") +
     theme_classic()
 }
 
