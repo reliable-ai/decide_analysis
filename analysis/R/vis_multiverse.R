@@ -8,14 +8,19 @@ vis_multiverse_tree <- function(
   show_dots = c("none", "coloured", "black"),
   show_decision_labels = c("text", "coloured", "none"),
   decision_label_pos = 0.6,
-  decision_label_angle = 0
+  decision_label_angle = 0,
+  # gap between the decision labels and the tree, as a fraction of the tree's width
+  decision_label_gap = 0.01,
+  # wrap multi-word decision labels onto separate lines (each line is kept
+  # shorter than this many characters, so 11 keeps e.g. "X Variable" together)
+  decision_label_width = 11
 ) {
   direction <- match.arg(direction)
   show_dots <- match.arg(show_dots)
   show_decision_labels <- match.arg(show_decision_labels)
 
   dim_cols <- grep(paste0("^", dim_prefix), names(mv), value = TRUE)
-  dim_names <- sub(paste0("^", dim_prefix), "", dim_cols)
+  dim_names <- nn(sub(paste0("^", dim_prefix), "", dim_cols))
 
   # Only keep combinations that actually exist in the data
   paths <- mv |>
@@ -90,11 +95,11 @@ vis_multiverse_tree <- function(
       mutate(
         parent_y = coalesce(parent_y, child_y + 1),
         y_pos = child_y + (parent_y - child_y) * decision_label_pos,
-        decision = dim_names[depth]
+        decision = scales::label_wrap(decision_label_width)(dim_names[depth])
       )
 
     x_range <- range(lay_df$x)
-    x_offset <- diff(x_range) * 0.06 + 0.2
+    x_offset <- diff(x_range) * decision_label_gap + 0.2
     decision_annot <- decision_annot |>
       mutate(x_pos = x_range[1] - x_offset)
 

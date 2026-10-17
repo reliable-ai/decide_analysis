@@ -22,7 +22,10 @@ mv_fert |>
 
 ```{r fertility-multiverse-tree}
 #| fig-width: 11
-vis_multiverse_tree(mv_fert)
+#| fig-height: 3.5
+p <- vis_multiverse_tree(mv_fert, label_size = 4)
+p
+ggsave(here("figures", "fertility-multiverse-tree.pdf"), p, width = 11, height = 3.5, create.dir = TRUE)
 ```
 
 ```{r fertility-multiverse-simple}
@@ -213,16 +216,15 @@ ablation_fert$inter_method_stability_summary |>
 
 ```{r fertility-ablation-inter-method-plot}
 #| fig-width: 3.2
-#| fig-height: 4
+#| fig-height: 3
 # same row order in the inter- and intra-method heatmaps
 decision_order_fert <- stability_decision_order(ablation_fert$intra_method_stability_summary)
-p <- vis_inter_method_stability(
+p_inter_fert <- vis_inter_method_stability(
   ablation_fert$inter_method_stability_summary,
   decision_order = decision_order_fert,
   value_size = 1.6
 ) + theme_stability_compact(left_margin = 22)
-p
-ggsave(here("figures", "fertility-ablation-inter-method.pdf"), p, width = 3.2, height = 4, create.dir = TRUE)
+p_inter_fert
 ```
 
 ## Intra-method stability
@@ -244,14 +246,20 @@ ablation_fert$intra_method_stability_summary |>
 
 ```{r fertility-ablation-intra-method-plot}
 #| fig-width: 3.2
-#| fig-height: 4
-p <- vis_intra_method_stability(
+#| fig-height: 3
+p_intra_fert <- vis_intra_method_stability(
   ablation_fert$intra_method_stability_summary,
   decision_order = decision_order_fert,
   value_size = 1.6
 ) + theme_stability_compact()
-p
-ggsave(here("figures", "fertility-ablation-intra-method.pdf"), p, width = 3.2, height = 4, create.dir = TRUE)
+p_intra_fert
+```
+
+```{r fertility-ablation-save-heatmaps}
+# same panel size and position in both saved heatmaps, so they line up side by side
+aligned_fert <- align_stability_plots(p_inter_fert, p_intra_fert)
+ggsave(here("figures", "fertility-ablation-inter-method.pdf"), aligned_fert[[1]], width = 3.2, height = 3, create.dir = TRUE)
+ggsave(here("figures", "fertility-ablation-intra-method.pdf"), aligned_fert[[2]], width = 3.2, height = 3, create.dir = TRUE)
 ```
 
 

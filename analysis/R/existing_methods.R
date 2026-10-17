@@ -74,20 +74,19 @@ calc_fanova_total_importance <- function (mv, colname_metric, dim_prefix = "mv_d
 
 # Total-importance-per-decision vector from a `calc_fanova()` result that was
 # computed with `use_individual = FALSE` (i.e. the full interaction
-# decomposition from `quantify_importance()`). Only the single-decision rows are
-# kept; their `total importance` is the decision's main effect plus every
-# interaction it participates in (comparable to DECIDE').
+# decomposition from `quantify_importance()`). A decision's total importance is
+# its main effect plus every interaction it participates in (comparable to
+# DECIDE'): the sum of the individual (pure) importances of all rows whose
+# level_* columns contain it. Note that fanova's own `total importance` column
+# is not this: for a set of decisions it sums over the set's subsets (like
+# DECIDE's main effect of the set), so for a single decision it just equals
+# the main effect.
 fanova_total_to_vec <- function (importance_df) {
-  level_cols <- colnames(importance_df)[startsWith(colnames(importance_df), "level_")]
-  higher_level_cols <- setdiff(level_cols, "level_0")
-
-  singletons <- importance_df
-  if (length(higher_level_cols) > 0) {
-    singletons <- singletons |> filter(if_all(all_of(higher_level_cols), is.na))
-  }
-
-  singletons |>
-    select(decision = level_0, total_importance) |>
+  importance_df |>
+    # one row per (effect, decision in that effect); `decision` is already taken
+    pivot_longer(starts_with("level_"), values_to = "member", values_drop_na = TRUE) |>
+    group_by(member) |>
+    summarise(total_importance = sum(individual_importance, na.rm = TRUE), .groups = "drop") |>
     deframe() |>
     sort(decreasing = TRUE)
 }

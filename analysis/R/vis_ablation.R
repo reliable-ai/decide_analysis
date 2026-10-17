@@ -205,8 +205,26 @@ theme_stability_compact <- function (left_margin = 2) {
       legend.box.spacing = unit(0.05, "in"),
       plot.margin = margin(2, 2, 2, left_margin)
     ),
-    scale_y_discrete(labels = scales::label_wrap(10))
+    # 11, not 10: label_wrap() keeps lines shorter than the width, so 10 would
+    # split 10-character labels like "X Variable"
+    scale_y_discrete(labels = scales::label_wrap(11))
   )
+}
+
+# Give stability heatmaps that are saved as separate figures the same space
+# for axis labels, legend and margins, so that when saved at the same width
+# and height their heatmap panels come out exactly the same size and in the
+# same place (e.g. the inter- and intra-method heatmaps placed side by side).
+# Returns the plots as a list, in the order given.
+align_stability_plots <- function (...) {
+  plots <- list(...)
+  # patchwork fixes the label space using the font metrics of the currently
+  # open device; measure on a PDF device, as the plots are saved as PDFs
+  # (screen and PNG devices measure the text smaller, clipping the labels)
+  grDevices::pdf(NULL)
+  on.exit(grDevices::dev.off())
+  dims <- patchwork::get_max_dim(plots)
+  lapply(plots, patchwork::set_dim, dim = dims)
 }
 
 vis_method_stability <- vis_inter_method_stability

@@ -29,7 +29,8 @@ compose_importance_table <- function (decide,
     )
 
   # fANOVA total is optional; drop the column entirely when not supplied.
-  fanova_cols <- if (is.null(fanova_total)) "fanova_main" else c("fanova_main", "fanova_total")
+  # total before main, matching the DECIDE columns
+  fanova_cols <- if (is.null(fanova_total)) "fanova_main" else c("fanova_total", "fanova_main")
 
   wide <- decide_tbl |>
     full_join(vec_tbl(fanova_main, "fanova_main"), by = "decision")
@@ -54,7 +55,7 @@ compose_importance_table <- function (decide,
     ))
 
   n_fanova <- length(fanova_cols)
-  fanova_names <- if (n_fanova == 2) c("Main", "Total") else "Main"
+  fanova_names <- if (n_fanova == 2) c("Total", "Main") else "Main"
 
   kbl <- knitr::kable(
     wide,
