@@ -38,3 +38,6 @@ analysis/*.html
 
 # notes
 notes/
+
+# mac ds store
+.DS_Store
