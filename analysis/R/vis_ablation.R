@@ -27,12 +27,31 @@ stability_decision_order <- function (stability_summary) {
     pull(fixed_decision_label)
 }
 
+# Fill scale of the stability heatmaps. With `include_negative`, the scale
+# spans the full correlation range from -1 to 1; otherwise it only spans 0 to 1
+# (for multiverses without negative correlations), with any negative values
+# squished onto 0.
+stability_fill_scale <- function (include_negative, fill_option) {
+  scale_fill_viridis_c(
+    limits = if (include_negative) c(-1, 1) else c(0, 1),
+    oob = scales::squish,
+    option = fill_option
+  )
+}
+
+# Value labels are white on the dark lowest quarter of the fill scale
+stability_label_color <- function (correlation, include_negative) {
+  dark_below <- if (include_negative) -0.5 else 0.25
+  if_else(!is.na(correlation) & correlation < dark_below, "white", "black")
+}
+
 vis_inter_method_stability <- function (inter_method_stability_summary,
                                         baseline_label = "Full Multiverse",
                                         show_values = TRUE,
                                         add_average = TRUE,
                                         fill_label = "Mean rank\ncorrelation",
                                         fill_option = "viridis",
+                                        include_negative = TRUE,
                                         decision_order = NULL,
                                         value_size = 3) {
   plot_data <- inter_method_stability_summary |>
@@ -86,11 +105,7 @@ vis_inter_method_stability <- function (inter_method_stability_summary,
         # show as 0.00 rather than -0.00
         formatC(round(mean_rank_correlation, 2) + 0, digits = 2, format = "f")
       ),
-      label_color = if_else(
-        !is.na(mean_rank_correlation) & mean_rank_correlation < -0.5,
-        "white",
-        "black"
-      )
+      label_color = stability_label_color(mean_rank_correlation, include_negative)
     )
 
   plot <- ggplot(
@@ -98,7 +113,7 @@ vis_inter_method_stability <- function (inter_method_stability_summary,
     aes(x = comparison, y = fixed_decision_label, fill = mean_rank_correlation)
   ) +
     geom_tile() +
-    scale_fill_viridis_c(limits = c(-1, 1), option = fill_option) +
+    stability_fill_scale(include_negative, fill_option) +
     labs(x = NULL, y = NULL, fill = fill_label) +
     theme_classic() +
     theme(axis.text.x = element_text(angle = 45, hjust = 1))
@@ -119,12 +134,14 @@ vis_inter_method_stability <- function (inter_method_stability_summary,
 # showing the pair's mean rank correlation averaged over all rows of the
 # inter-method heatmap (the full multiverse and every fixed decision), i.e. the
 # values of that heatmap's "Average" row. Only the lower triangle is drawn.
-# Use the same `fill_option` as the matching vis_inter_method_stability() plot.
+# Use the same `fill_option` and `include_negative` as the matching
+# vis_inter_method_stability() plot.
 vis_inter_method_matrix <- function (inter_method_stability_summary,
                                      include_baseline = TRUE,
                                      show_values = TRUE,
                                      fill_label = "Mean rank\ncorrelation",
                                      fill_option = "viridis",
+                                     include_negative = TRUE,
                                      value_size = 3) {
   if (!include_baseline) {
     inter_method_stability_summary <- inter_method_stability_summary |>
@@ -159,11 +176,7 @@ vis_inter_method_matrix <- function (inter_method_stability_summary,
         # show as 0.00 rather than -0.00
         formatC(round(mean_rank_correlation, 2) + 0, digits = 2, format = "f")
       ),
-      label_color = if_else(
-        !is.na(mean_rank_correlation) & mean_rank_correlation < -0.5,
-        "white",
-        "black"
-      )
+      label_color = stability_label_color(mean_rank_correlation, include_negative)
     )
 
   plot <- ggplot(
@@ -171,7 +184,7 @@ vis_inter_method_matrix <- function (inter_method_stability_summary,
     aes(x = method_first, y = method_second, fill = mean_rank_correlation)
   ) +
     geom_tile() +
-    scale_fill_viridis_c(limits = c(-1, 1), option = fill_option) +
+    stability_fill_scale(include_negative, fill_option) +
     coord_equal() +
     labs(x = NULL, y = NULL, fill = fill_label) +
     theme_classic() +
@@ -190,6 +203,7 @@ vis_intra_method_stability <- function (intra_method_stability_summary,
                                         add_average = TRUE,
                                         fill_label = "Mean rank\ncorrelation",
                                         fill_option = "mako",
+                                        include_negative = TRUE,
                                         decision_order = NULL,
                                         value_size = 3) {
   plot_data <- intra_method_stability_summary
@@ -222,11 +236,7 @@ vis_intra_method_stability <- function (intra_method_stability_summary,
         # show as 0.00 rather than -0.00
         formatC(round(mean_rank_correlation, 2) + 0, digits = 2, format = "f")
       ),
-      label_color = if_else(
-        !is.na(mean_rank_correlation) & mean_rank_correlation < -0.5,
-        "white",
-        "black"
-      )
+      label_color = stability_label_color(mean_rank_correlation, include_negative)
     )
 
   plot <- ggplot(
@@ -238,7 +248,7 @@ vis_intra_method_stability <- function (intra_method_stability_summary,
     )
   ) +
     geom_tile() +
-    scale_fill_viridis_c(limits = c(-1, 1), option = fill_option) +
+    stability_fill_scale(include_negative, fill_option) +
     labs(x = NULL, y = NULL, fill = fill_label) +
     theme_classic() +
     theme(axis.text.x = element_text(angle = 45, hjust = 1))

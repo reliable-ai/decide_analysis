@@ -92,6 +92,7 @@ ablation_mtf$inter_method_stability_summary |>
 decision_order_mtf <- stability_decision_order(ablation_mtf$intra_method_stability_summary)
 p <- vis_inter_method_stability(
   ablation_mtf$inter_method_stability_summary,
+  include_negative = TRUE,
   fill_label = "Mean Pearson\ncorrelation",
   fill_option = "plasma",
   decision_order = decision_order_mtf,
@@ -107,6 +108,7 @@ ggsave(here("figures", "mtf-ablation-inter-method.pdf"), p, width = 3.2, height 
 # method pairs' mean correlations, averaged over all rows of the heatmap above
 p <- vis_inter_method_matrix(
   ablation_mtf$inter_method_stability_summary,
+  include_negative = TRUE,
   fill_label = "Mean Pearson\ncorrelation",
   fill_option = "plasma",
   value_size = 1.6
@@ -133,6 +135,7 @@ ablation_mtf$intra_method_stability_summary |>
 #| fig-height: 4
 p <- vis_intra_method_stability(
   ablation_mtf$intra_method_stability_summary,
+  include_negative = TRUE,
   fill_label = "Mean Pearson\ncorrelation",
   fill_option = "cividis",
   decision_order = decision_order_mtf,
