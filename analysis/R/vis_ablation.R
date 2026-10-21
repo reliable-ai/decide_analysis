@@ -115,6 +115,76 @@ vis_inter_method_stability <- function (inter_method_stability_summary,
   plot
 }
 
+# Correlation-matrix view of inter-method stability: one tile per method pair,
+# showing the pair's mean rank correlation averaged over all rows of the
+# inter-method heatmap (the full multiverse and every fixed decision), i.e. the
+# values of that heatmap's "Average" row. Only the lower triangle is drawn.
+# Use the same `fill_option` as the matching vis_inter_method_stability() plot.
+vis_inter_method_matrix <- function (inter_method_stability_summary,
+                                     include_baseline = TRUE,
+                                     show_values = TRUE,
+                                     fill_label = "Mean rank\ncorrelation",
+                                     fill_option = "viridis",
+                                     value_size = 3) {
+  if (!include_baseline) {
+    inter_method_stability_summary <- inter_method_stability_summary |>
+      filter(fixed_decision != "full_multiverse")
+  }
+
+  plot_data <- inter_method_stability_summary |>
+    mutate(
+      # order the two methods within each pair canonically, so that each pair
+      # falls into the lower triangle
+      swap_methods = method_rank(method_x) > method_rank(method_y),
+      method_first = if_else(swap_methods, method_y, method_x),
+      method_second = if_else(swap_methods, method_x, method_y)
+    ) |>
+    group_by(method_first, method_second) |>
+    summarise(mean_rank_correlation = safe_mean(mean_rank_correlation), .groups = "drop")
+
+  # every method but the last on the x-axis, every method but the first on the
+  # y-axis (top to bottom), so the tiles form a lower triangle
+  methods <- order_methods(c(plot_data$method_first, plot_data$method_second))
+  x_levels <- head(methods, -1)
+  y_levels <- rev(methods[-1])
+
+  plot_data <- plot_data |>
+    mutate(
+      method_first = factor(nn(method_first), levels = nn(x_levels)),
+      method_second = factor(nn(method_second), levels = nn(y_levels)),
+      correlation_label = if_else(
+        is.na(mean_rank_correlation),
+        "NA",
+        # round first and add 0, so that values rounding to zero from below
+        # show as 0.00 rather than -0.00
+        formatC(round(mean_rank_correlation, 2) + 0, digits = 2, format = "f")
+      ),
+      label_color = if_else(
+        !is.na(mean_rank_correlation) & mean_rank_correlation < -0.5,
+        "white",
+        "black"
+      )
+    )
+
+  plot <- ggplot(
+    plot_data,
+    aes(x = method_first, y = method_second, fill = mean_rank_correlation)
+  ) +
+    geom_tile() +
+    scale_fill_viridis_c(limits = c(-1, 1), option = fill_option) +
+    coord_equal() +
+    labs(x = NULL, y = NULL, fill = fill_label) +
+    theme_classic() +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+  if (show_values) {
+    plot <- plot + geom_text(aes(label = correlation_label, color = label_color), size = value_size) +
+      scale_color_identity()
+  }
+
+  plot
+}
+
 vis_intra_method_stability <- function (intra_method_stability_summary,
                                         show_values = TRUE,
                                         add_average = TRUE,

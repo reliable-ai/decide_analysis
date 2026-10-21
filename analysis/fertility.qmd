@@ -231,6 +231,18 @@ p_inter_fert <- vis_inter_method_stability(
 p_inter_fert
 ```
 
+```{r fertility-ablation-inter-method-matrix}
+#| fig-width: 3.2
+#| fig-height: 2.6
+# method pairs' mean correlations, averaged over all rows of the heatmap above
+p <- vis_inter_method_matrix(
+  ablation_fert$inter_method_stability_summary,
+  value_size = 1.6
+) + theme_stability_compact()
+p
+ggsave(here("figures", "fertility-ablation-inter-method-matrix.pdf"), p, width = 3.2, height = 2.6, create.dir = TRUE)
+```
+
 ## Intra-method stability
 
 For each method separately, compare its full-multiverse importance vector to

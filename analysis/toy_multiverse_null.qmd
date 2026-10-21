@@ -163,6 +163,12 @@ ablation_toy$inter_method_stability_summary |>
 vis_inter_method_stability(ablation_toy$inter_method_stability_summary)
 ```
 
+```{r toy-ablation-inter-method-matrix}
+#| fig-width: 5
+#| fig-height: 4
+vis_inter_method_matrix(ablation_toy$inter_method_stability_summary)
+```
+
 ## Intra-method stability
 
 ```{r toy-ablation-intra-method-table}

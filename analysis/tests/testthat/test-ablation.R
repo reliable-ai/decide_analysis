@@ -147,6 +147,37 @@ test_that("vis_inter_method_stability rotates x-axis labels", {
   expect_equal(plot$theme$axis.text.x$hjust, 1)
 })
 
+test_that("vis_inter_method_matrix averages each method pair over all rows", {
+  inter_method_stability_summary <- tibble(
+    method_x = c("regression", "regression", "regression", "decide"),
+    method_y = c("decide", "decide", "fanova", "fanova"),
+    fixed_decision = c("full_multiverse", "mv_dim_A", "mv_dim_A", "mv_dim_A"),
+    fixed_decision_label = c("full_multiverse", "A", "A", "A"),
+    mean_rank_correlation = c(0.2, 0.6, 0.5, -0.8)
+  )
+
+  plot <- vis_inter_method_matrix(inter_method_stability_summary)
+  averaged <- plot$data |> arrange(method_first, desc(method_second))
+
+  expect_s3_class(plot, "ggplot")
+  # methods in canonical order: earlier method on the x-axis
+  expect_equal(as.character(averaged$method_first), nn(c("decide", "decide", "fanova")))
+  expect_equal(as.character(averaged$method_second), nn(c("fanova", "regression", "regression")))
+  expect_equal(averaged$mean_rank_correlation, c(-0.8, 0.4, 0.5))
+  expect_equal(averaged$label_color, c("white", "black", "black"))
+
+  without_baseline <- vis_inter_method_matrix(
+    inter_method_stability_summary,
+    include_baseline = FALSE
+  )$data
+  expect_equal(
+    without_baseline |>
+      filter(method_second == nn("regression"), method_first == nn("decide")) |>
+      pull(mean_rank_correlation),
+    0.6
+  )
+})
+
 test_that("vis_intra_method_stability rotates x-axis labels", {
   intra_method_stability_summary <- tibble(
     method = "within",

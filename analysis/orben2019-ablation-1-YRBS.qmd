@@ -74,6 +74,20 @@ p_inter_yrbs <- vis_inter_method_stability(
 p_inter_yrbs
 ```
 
+```{r yrbs-ablation-inter-method-matrix}
+#| fig-width: 3.2
+#| fig-height: 2.6
+# method pairs' mean correlations, averaged over all rows of the heatmap above
+p <- vis_inter_method_matrix(
+  ablation_yrbs$inter_method_stability_summary,
+  fill_label = "Mean Pearson\ncorrelation",
+  fill_option = "plasma",
+  value_size = 1.6
+) + theme_stability_compact()
+p
+ggsave(here("figures", "yrbs-ablation-inter-method-matrix.pdf"), p, width = 3.2, height = 2.6, create.dir = TRUE)
+```
+
 ### Intra-method stability
 
 ```{r yrbs-ablation-intra-method-table}
