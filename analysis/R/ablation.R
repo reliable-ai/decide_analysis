@@ -282,21 +282,13 @@ calc_ablation_importance <- function (
   )
 }
 
-# The base method a (possibly variant-suffixed) method name belongs to, e.g.
-# both `decide_main` and `decide_total` map to `decide`.
-method_family <- function (method) {
-  sub("_(main|total)$", "", method)
-}
-
 # Compares importance rankings between every pair of methods.
 # For each (fixed_decision, fixed_option), it correlates method-specific
 # importance vectors across target decisions after pivoting to wide format.
 # The reported rank_correlation is Spearman by default.
 calc_inter_method_stability <- function (importance_tbl, cor_method = "spearman") {
   methods <- unique(importance_tbl$method)
-  # Create compairson pairings, but skip comparisons between equal methods
-  method_pairs <- combn(methods, 2, simplify = FALSE) |>
-    purrr::keep(function (pair) method_family(pair[[1]]) != method_family(pair[[2]]))
+  method_pairs <- combn(methods, 2, simplify = FALSE)
 
   purrr::map_dfr(
     method_pairs,
