@@ -41,7 +41,7 @@ stability_fill_scale <- function (include_negative, fill_option) {
 
 # Value labels are white on the dark lowest quarter of the fill scale
 stability_label_color <- function (correlation, include_negative) {
-  dark_below <- if (include_negative) -0.5 else 0.25
+  dark_below <- if (include_negative) -0.2 else 0.4
   if_else(!is.na(correlation) & correlation < dark_below, "white", "black")
 }
 
