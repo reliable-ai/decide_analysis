@@ -276,7 +276,8 @@ vis_intra_method_stability <- function (intra_method_stability_summary,
                                         fill_option = "mako",
                                         include_negative = TRUE,
                                         decision_order = NULL,
-                                        value_size = 3) {
+                                        value_size = 3,
+                                        highlight_best_average = TRUE) {
   plot_data <- intra_method_stability_summary
 
   if (add_average) {
@@ -307,7 +308,18 @@ vis_intra_method_stability <- function (intra_method_stability_summary,
         # show as 0.00 rather than -0.00
         formatC(round(mean_rank_correlation, 2) + 0, digits = 2, format = "f")
       ),
-      label_color = stability_label_color(mean_rank_correlation, include_negative)
+      label_color = stability_label_color(mean_rank_correlation, include_negative),
+      # bold the highest value(s) in the average row; compare at the displayed
+      # precision so that values tied after rounding are all highlighted
+      is_average = fixed_decision == "overall_average",
+      rounded_average = if_else(is_average, round(mean_rank_correlation, 2), NA_real_),
+      label_fontface = if_else(
+        highlight_best_average &
+          is_average &
+          rounded_average %in% suppressWarnings(max(rounded_average, na.rm = TRUE)),
+        "bold",
+        "plain"
+      )
     )
 
   plot <- ggplot(
@@ -325,7 +337,11 @@ vis_intra_method_stability <- function (intra_method_stability_summary,
     theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
   if (show_values) {
-    plot <- plot + geom_text(aes(label = correlation_label, color = label_color), size = value_size) +
+    plot <- plot +
+      geom_text(
+        aes(label = correlation_label, color = label_color, fontface = label_fontface),
+        size = value_size
+      ) +
       scale_color_identity()
   }
 
