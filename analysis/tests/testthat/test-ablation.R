@@ -147,35 +147,43 @@ test_that("vis_inter_method_stability rotates x-axis labels", {
   expect_equal(plot$theme$axis.text.x$hjust, 1)
 })
 
-test_that("vis_inter_method_matrix averages each method pair over all rows", {
+test_that("vis_inter_method_matrix shows the full multiverse above and the ablated average below", {
   inter_method_stability_summary <- tibble(
-    method_x = c("regression", "regression", "regression", "decide"),
-    method_y = c("decide", "decide", "fanova", "fanova"),
-    fixed_decision = c("full_multiverse", "mv_dim_A", "mv_dim_A", "mv_dim_A"),
-    fixed_decision_label = c("full_multiverse", "A", "A", "A"),
-    mean_rank_correlation = c(0.2, 0.6, 0.5, -0.8)
+    method_x = c("regression", "regression", "decide", "regression", "regression", "decide"),
+    method_y = c("decide", "fanova", "fanova", "decide", "decide", "fanova"),
+    fixed_decision = c(rep("full_multiverse", 3), "mv_dim_A", "mv_dim_B", "mv_dim_A"),
+    fixed_decision_label = c(rep("full_multiverse", 3), "A", "B", "A"),
+    mean_rank_correlation = c(0.2, 0.3, 0.1, 0.6, 0.4, -0.8)
   )
 
-  plot <- vis_inter_method_matrix(inter_method_stability_summary)
-  averaged <- plot$data |> arrange(method_first, desc(method_second))
+  plot <- vis_inter_method_matrix(inter_method_stability_summary, offset = 1.5)
+  tiles <- plot$data |> arrange(triangle, x, desc(y))
 
   expect_s3_class(plot, "ggplot")
-  # methods in canonical order: earlier method on the x-axis
-  expect_equal(as.character(averaged$method_first), nn(c("decide", "decide", "fanova")))
-  expect_equal(as.character(averaged$method_second), nn(c("fanova", "regression", "regression")))
-  expect_equal(averaged$mean_rank_correlation, c(-0.8, 0.4, 0.5))
-  expect_equal(averaged$label_color, c("white", "black", "black"))
-
-  without_baseline <- vis_inter_method_matrix(
+  # lower triangle: ablated multiverses averaged per pair, earlier method in
+  # canonical order (decide, fanova, regression) on the x-axis
+  lower <- tiles |> filter(triangle == "lower")
+  expect_equal(lower$method_first, c("decide", "decide"))
+  expect_equal(lower$method_second, c("fanova", "regression"))
+  expect_equal(lower$mean_rank_correlation, c(-0.8, 0.5))
+  expect_equal(lower$x, c(1, 1))
+  expect_equal(lower$y, c(2, 1))
+  expect_equal(lower$label_color, c("white", "black"))
+  # upper triangle: the full multiverse, transposed and shifted by the offset
+  upper <- tiles |> filter(triangle == "upper")
+  expect_equal(upper$mean_rank_correlation, c(0.1, 0.2, 0.3))
+  # without the diagonal, the upper triangle moves one tile closer
+  expect_equal(upper$x, c(2, 3, 3) + 0.5)
+  expect_equal(upper$y, c(3, 3, 2) + 0.5)
+  with_diagonal <- vis_inter_method_matrix(
     inter_method_stability_summary,
-    include_baseline = FALSE
-  )$data
-  expect_equal(
-    without_baseline |>
-      filter(method_second == nn("regression"), method_first == nn("decide")) |>
-      pull(mean_rank_correlation),
-    0.6
+    offset = 1.5,
+    show_diagonal = TRUE
   )
+  expect_equal(sort(with_diagonal$data$x[with_diagonal$data$triangle == "upper"]), c(2, 3, 3) + 1.5)
+
+  expect_equal(plot$labels$title, "Full Multiverse")
+  expect_equal(plot$labels$caption, "Average of Ablated")
 })
 
 test_that("vis_intra_method_stability rotates x-axis labels", {

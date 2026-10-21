@@ -130,45 +130,63 @@ vis_inter_method_stability <- function (inter_method_stability_summary,
   plot
 }
 
-# Correlation-matrix view of inter-method stability: one tile per method pair,
-# showing the pair's mean rank correlation averaged over all rows of the
-# inter-method heatmap (the full multiverse and every fixed decision), i.e. the
-# values of that heatmap's "Average" row. Only the lower triangle is drawn.
+# Correlation-matrix view of inter-method stability: two matching triangular
+# correlation matrices of the method pairs, offset along the diagonal. The upper
+# triangle (top and right axes) shows the pairs' correlations on the full
+# multiverse, i.e. the "Full Multiverse" row of the inter-method heatmap; the
+# lower triangle (bottom and left axes) shows their mean correlation across all
+# ablated multiverses, i.e. the average of the heatmap's fixed-decision rows.
 # Use the same `fill_option` and `include_negative` as the matching
-# vis_inter_method_stability() plot.
+# vis_inter_method_stability() plot. `show_diagonal` adds the (trivial) diagonal
+# of each matrix as `diagonal_fill` tiles. `offset` (in tiles) sets the
+# diagonal shift between the two triangles; values above 1 leave a gap of
+# `offset - 1` tiles between them.
 vis_inter_method_matrix <- function (inter_method_stability_summary,
-                                     include_baseline = TRUE,
+                                     upper_label = "Full Multiverse",
+                                     lower_label = "Average of Ablated Multiverses",
                                      show_values = TRUE,
                                      fill_label = "Mean rank\ncorrelation",
                                      fill_option = "viridis",
                                      include_negative = TRUE,
+                                     show_diagonal = TRUE,
+                                     diagonal_fill = "black",
+                                     offset = 1.2,
                                      value_size = 3) {
-  if (!include_baseline) {
-    inter_method_stability_summary <- inter_method_stability_summary |>
-      filter(fixed_decision != "full_multiverse")
-  }
-
-  plot_data <- inter_method_stability_summary |>
+  pair_data <- inter_method_stability_summary |>
     mutate(
       # order the two methods within each pair canonically, so that each pair
-      # falls into the lower triangle
+      # falls into its triangle
       swap_methods = method_rank(method_x) > method_rank(method_y),
       method_first = if_else(swap_methods, method_y, method_x),
-      method_second = if_else(swap_methods, method_x, method_y)
+      method_second = if_else(swap_methods, method_x, method_y),
+      triangle = if_else(fixed_decision == "full_multiverse", "upper", "lower")
     ) |>
-    group_by(method_first, method_second) |>
+    group_by(triangle, method_first, method_second) |>
     summarise(mean_rank_correlation = safe_mean(mean_rank_correlation), .groups = "drop")
 
-  # every method but the last on the x-axis, every method but the first on the
-  # y-axis (top to bottom), so the tiles form a lower triangle
-  methods <- order_methods(c(plot_data$method_first, plot_data$method_second))
-  x_levels <- head(methods, -1)
-  y_levels <- rev(methods[-1])
+  # methods run left to right and top to bottom in both triangles; the lower
+  # triangle puts the earlier method of a pair on the x-axis, the upper one
+  # (its transpose) on the y-axis, and the upper triangle sits `shift` tiles
+  # up and to the right. Without the diagonal, each triangle's first row and
+  # last column are empty, so the upper triangle moves one tile closer to keep
+  # the same gap.
+  methods <- order_methods(c(pair_data$method_first, pair_data$method_second))
+  n_methods <- length(methods)
+  row_y <- function (method) n_methods + 1 - match(method, methods)
+  shift <- if (show_diagonal) offset else offset - 1
 
-  plot_data <- plot_data |>
+  plot_data <- pair_data |>
     mutate(
-      method_first = factor(nn(method_first), levels = nn(x_levels)),
-      method_second = factor(nn(method_second), levels = nn(y_levels)),
+      x = if_else(
+        triangle == "upper",
+        match(method_second, methods) + shift,
+        match(method_first, methods)
+      ),
+      y = if_else(
+        triangle == "upper",
+        row_y(method_first) + shift,
+        row_y(method_second)
+      ),
       correlation_label = if_else(
         is.na(mean_rank_correlation),
         "NA",
@@ -179,16 +197,69 @@ vis_inter_method_matrix <- function (inter_method_stability_summary,
       label_color = stability_label_color(mean_rank_correlation, include_negative)
     )
 
-  plot <- ggplot(
-    plot_data,
-    aes(x = method_first, y = method_second, fill = mean_rank_correlation)
-  ) +
-    geom_tile() +
+  # methods with tiles on each axis: the lower triangle's x-axis and the upper
+  # triangle's y-axis lack the last method, the other two axes the first
+  first_methods <- if (show_diagonal) methods else head(methods, -1)
+  second_methods <- if (show_diagonal) methods else methods[-1]
+  x_breaks <- match(first_methods, methods)
+  y_breaks <- row_y(second_methods)
+  x_breaks_upper <- match(second_methods, methods) + shift
+  y_breaks_upper <- row_y(first_methods) + shift
+
+  # the axis lines only span their own triangle, so they are drawn by hand
+  # rather than by the theme
+  pad <- 0.15
+  low <- 0.5 - pad
+  high <- n_methods + shift + 0.5 + pad
+  axis_lines <- tibble(
+    x = c(low, low, min(x_breaks_upper) - 0.5 - pad, high),
+    xend = c(max(x_breaks) + 0.5 + pad, low, high, high),
+    y = c(low, low, high, min(y_breaks_upper) - 0.5 - pad),
+    yend = c(low, max(y_breaks) + 0.5 + pad, high, high)
+  )
+
+  plot <- ggplot(plot_data, aes(x = x, y = y)) +
+    # explicit tile size, as the offset coordinates would make geom_tile() guess
+    # too small tiles
+    geom_tile(aes(fill = mean_rank_correlation), width = 1, height = 1) +
+    geom_segment(
+      data = axis_lines,
+      aes(x = x, xend = xend, y = y, yend = yend),
+      linewidth = 0.5,
+      lineend = "square"
+    ) +
     stability_fill_scale(include_negative, fill_option) +
-    coord_equal() +
-    labs(x = NULL, y = NULL, fill = fill_label) +
+    scale_x_continuous(
+      breaks = x_breaks,
+      labels = nn(first_methods),
+      sec.axis = dup_axis(breaks = x_breaks_upper, labels = nn(second_methods))
+    ) +
+    scale_y_continuous(
+      breaks = y_breaks,
+      labels = nn(second_methods),
+      sec.axis = dup_axis(breaks = y_breaks_upper, labels = nn(first_methods))
+    ) +
+    coord_equal(xlim = c(low, high), ylim = c(low, high), expand = FALSE, clip = "off") +
+    labs(x = NULL, y = NULL, fill = fill_label, title = upper_label, caption = lower_label) +
     theme_classic() +
-    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+    theme(
+      axis.line = element_blank(),
+      axis.text.x.bottom = element_text(angle = 45, hjust = 1),
+      axis.text.x.top = element_text(angle = 45, hjust = 0),
+      # same size for both triangles' labels (theme_classic() sizes the
+      # caption smaller than the title)
+      plot.title = element_text(face = "bold", size = rel(1), hjust = 1),
+      plot.caption = element_text(face = "bold", size = rel(1), hjust = 0)
+    )
+
+  if (show_diagonal) {
+    diagonal_data <- tibble(
+      x = c(seq_len(n_methods), seq_len(n_methods) + shift),
+      y = c(row_y(methods), row_y(methods) + shift)
+    )
+    plot <- plot +
+      geom_tile(data = diagonal_data, fill = diagonal_fill, width = 1, height = 1)
+  }
 
   if (show_values) {
     plot <- plot + geom_text(aes(label = correlation_label, color = label_color), size = value_size) +
@@ -271,8 +342,10 @@ vis_intra_method_stability <- function (intra_method_stability_summary,
 # `value_size = 1.6` in the heatmap functions. `left_margin` (in points) leaves
 # room for the first rotated x-axis label when it is wider than the decision
 # names, e.g. the long method pairs of the inter-method heatmap (use 22 there).
-theme_stability_compact <- function (left_margin = 2) {
-  list(
+# Pass `wrap_y_labels = FALSE` for plots with their own y scale, such as
+# vis_inter_method_matrix(), whose scale would otherwise be replaced.
+theme_stability_compact <- function (left_margin = 2, wrap_y_labels = TRUE) {
+  compact <- list(
     theme(
       text = element_text(size = 7),
       axis.text = element_text(size = 6.5),
@@ -287,8 +360,9 @@ theme_stability_compact <- function (left_margin = 2) {
     ),
     # 11, not 10: label_wrap() keeps lines shorter than the width, so 10 would
     # split 10-character labels like "X Variable"
-    scale_y_discrete(labels = scales::label_wrap(11))
+    if (wrap_y_labels) scale_y_discrete(labels = scales::label_wrap(11))
   )
+  purrr::compact(compact)
 }
 
 # Give stability heatmaps that are saved as separate figures the same space

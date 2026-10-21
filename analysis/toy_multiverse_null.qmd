@@ -165,7 +165,7 @@ vis_inter_method_stability(ablation_toy$inter_method_stability_summary)
 
 ```{r toy-ablation-inter-method-matrix}
 #| fig-width: 5
-#| fig-height: 4
+#| fig-height: 4.5
 vis_inter_method_matrix(ablation_toy$inter_method_stability_summary)
 ```
 

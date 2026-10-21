@@ -233,15 +233,16 @@ p_inter_hurr
 
 ```{r hurricane-ablation-inter-method-matrix}
 #| fig-width: 3.2
-#| fig-height: 2.6
-# method pairs' mean correlations, averaged over all rows of the heatmap above
+#| fig-height: 2.9
+# method pairs on the full multiverse (upper) and averaged over all ablated
+# multiverses (lower), i.e. the rows of the heatmap above
 p <- vis_inter_method_matrix(
   ablation_hurr$inter_method_stability_summary,
   include_negative = FALSE,
   value_size = 1.6
-) + theme_stability_compact()
+) + theme_stability_compact(wrap_y_labels = FALSE)
 p
-ggsave(here("figures", "hurricane-ablation-inter-method-matrix.pdf"), p, width = 3.2, height = 2.6, create.dir = TRUE)
+ggsave(here("figures", "hurricane-ablation-inter-method-matrix.pdf"), p, width = 3.2, height = 2.9, create.dir = TRUE)
 ```
 
 ## Intra-method stability
