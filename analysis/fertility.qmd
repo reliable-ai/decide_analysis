@@ -20,6 +20,10 @@ mv_fert |>
   get_multiverse_decisions()
 ```
 
+```{r fertility-full-design-check}
+check_full_design(mv_fert)
+```
+
 ```{r fertility-multiverse-tree}
 #| fig-width: 11
 #| fig-height: 3.5

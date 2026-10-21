@@ -20,6 +20,10 @@ mv_hurr |>
   get_multiverse_decisions()
 ```
 
+```{r hurricane-full-design-check}
+check_full_design(mv_hurr)
+```
+
 ```{r hurricane-multiverse-simple}
 #| fig-width: 10
 vis_multiverse_simple(mv_hurr, direction = "right")

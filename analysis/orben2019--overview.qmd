@@ -90,6 +90,10 @@ mv_yrbs |>
   get_multiverse_decisions()
 ```
 
+```{r yrbs-full-design-check}
+check_full_design(mv_yrbs)
+```
+
 ```{r yrbs-multiverse-simple}
 #| fig-width: 10
 vis_multiverse_simple(mv_yrbs, direction = "right")
@@ -102,6 +106,10 @@ mv_mtf |>
   get_multiverse_decisions()
 ```
 
+```{r mtf-full-design-check}
+check_full_design(mv_mtf)
+```
+
 ```{r mtf-multiverse-simple}
 #| fig-width: 10
 vis_multiverse_simple(mv_mtf, direction = "right")
@@ -112,6 +120,10 @@ vis_multiverse_simple(mv_mtf, direction = "right")
 ```{r mcs-decisions-overview}
 mv_mcs |>
   get_multiverse_decisions()
+```
+
+```{r mcs-full-design-check}
+check_full_design(mv_mcs)
 ```
 
 ```{r mcs-multiverse-simple}
