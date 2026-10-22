@@ -7,8 +7,10 @@ remove_fake_decisions <- function (mv, dim_prefix = "mv_dim_") {
   mv |> select(-all_of(fake))
 }
 
+# Further arguments in `...` are passed on to the Python fANOVA object, e.g.
+# `bootstrapping = FALSE` or `max_features = 3L` for the forest's settings.
 calc_fanova <- function (mv, colname_metric, dim_prefix = "mv_dim_", use_individual = FALSE,
-                         seed = 42) {
+                         seed = 42, ...) {
   use_virtualenv("../.venv/")
 
   feature_names <- mv |>
@@ -38,7 +40,8 @@ calc_fanova <- function (mv, colname_metric, dim_prefix = "mv_dim_", use_individ
   mv_fav <- mv_fanova_mod$MultiverseFanova(
     features = X_pd,
     outcome = y_pd,
-    seed = if (is.null(seed)) NULL else as.integer(seed)
+    seed = if (is.null(seed)) NULL else as.integer(seed),
+    ...
   )
   if (use_individual) {
     result_pd <- mv_fav$quantify_individual_importance(save_to = result_csv)

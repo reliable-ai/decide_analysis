@@ -1,0 +1,445 @@
+---
+title: "Toy Simulations"
+format: pdf
+---
+
+R version of `src/simulations/toy_examples.ipynb`, translation aided by Claude.
+DECIDE, regression and fANOVA use the R implementations in `R/` (`decide()`,
+`calc_regression()` and `calc_fanova()`); the random forests' MDI and
+permutation importances come from scikit-learn via reticulate, since it allows
+trees to be grown deeper and thus actually learn the small multiverse. R
+versions of RF still cause MDI and PFI to get it wrong, but it is so wrong
+mostly due to poor fit, which is not the point we are trying to make here.
+Results are identical to the toy_examples.ipynb file.
+
+We would like to show that our framework elegantly handles cases where
+surrogate model-based decision importances fail. In particular, we consider toy
+multiverses that poke holes in how regression and random forests handle
+decision importances.
+
+```{r setup}
+here::i_am("toy_examples.qmd")
+source(here::here("R", "_load.R"))
+use_virtualenv(here::here("..", ".venv"))
+sk_ensemble <- import("sklearn.ensemble")
+sk_inspection <- import("sklearn.inspection")
+```
+
+## Helpers
+
+```{r helpers}
+# A toy multiverse from a 0/1 design matrix (one column per decision) and its
+# outcomes, with the decisions as mv_dim_ columns
+make_toy_mv <- function (X, accuracy) {
+  as_tibble(X, .name_repair = "minimal") |>
+    rename_with(\(name) paste0("mv_dim_", name)) |>
+    mutate(accuracy = accuracy)
+}
+
+toy_design <- function (mv) {
+  as.matrix(mv |> select(starts_with("mv_dim_")))
+}
+
+# DECIDE total effect per decision, in the multiverse's decision order
+decide_total <- function (mv) {
+  result <- decide(mv, "accuracy")
+  setNames(result$decide_total, result$dimension)[colnames(toy_design(mv))]
+}
+
+# Random forest (scikit-learn defaults) importances, averaged over `seeds`: mean
+# decrease in impurity (MDI) and permutation feature importance (PFI, increase
+# in MSE over 50 shuffles), plus the in-sample R^2
+rf_importances <- function (mv, seeds, bootstrap = TRUE) {
+  X <- toy_design(mv)
+  y <- mv$accuracy
+  runs <- lapply(seeds, function (seed) {
+    rf <- sk_ensemble$RandomForestRegressor(random_state = as.integer(seed), bootstrap = bootstrap)
+    rf$fit(X, y)
+    pfi <- sk_inspection$permutation_importance(
+      rf, X, y, n_repeats = 50L, random_state = as.integer(seed),
+      scoring = "neg_mean_squared_error"
+    )
+    predictions <- as.numeric(rf$predict(X))
+    list(
+      mdi = setNames(as.numeric(rf$feature_importances_), colnames(X)),
+      pfi = setNames(as.numeric(pfi$importances_mean), colnames(X)),
+      r2 = 1 - sum((y - predictions)^2) / sum((y - mean(y))^2),
+      predictions = predictions
+    )
+  })
+  list(
+    mdi = do.call(rbind, lapply(runs, \(run) run$mdi)),
+    pfi = do.call(rbind, lapply(runs, \(run) run$pfi)),
+    r2 = mean(vapply(runs, \(run) run$r2, numeric(1))),
+    predictions = rowMeans(sapply(runs, \(run) run$predictions))
+  )
+}
+
+# fANOVA main effects (each decision on its own) and total effects (main effect
+# plus every interaction the decision is part of), averaged over `seeds`.
+# Further arguments go to the fANOVA forest (see calc_fanova()).
+fanova_main_total <- function (mv, seeds, ...) {
+  runs <- lapply(seeds, function (seed) {
+    # (quiet: calc_fanova() reads its results back with an unnamed index column)
+    components <- suppressMessages(
+      calc_fanova(mv, "accuracy", use_individual = FALSE, seed = seed, ...)
+    )
+    level_cols <- grep("^level_", colnames(components), value = TRUE)
+    main <- components |>
+      filter(if_all(all_of(setdiff(level_cols, "level_0")), is.na)) |>
+      select(decision = level_0, main = individual_importance)
+    total <- fanova_total_to_vec(components) |>
+      enframe(name = "decision", value = "total")
+    left_join(main, total, by = "decision")
+  })
+  bind_rows(runs) |>
+    group_by(decision) |>
+    summarise(main = mean(main), total = mean(total), .groups = "drop") |>
+    arrange(match(decision, colnames(toy_design(mv))))
+}
+```
+
+# Toy Multiverse #1
+
+**Regression predictions fail; RF predictions succeed; MDI importances fail;
+permutation importances succeed.**
+
+Interactions can cause linear regression models to fail both in prediction and
+interpretation, assuming that the interaction terms are not all included. If
+the interaction terms are all included, this can also lead to the case where
+$p = n$, so the regression will perfectly interpolate the data, but the model
+will have zero residual degrees of freedom, making statistical inference
+impossible (i.e. no standard errors or p-values can be calculated). Thus the
+only way around this problem is to know the interactions in advance, which is
+infeasible for large/complex multiverses.
+
+Since random forests are ensembles of rule-based models, they handle the
+multiverses with a high amount of accuracy. In fact, if we set
+`bootstrap = False` (since we observe the full multiverse), then it will often
+get perfect predictive accuracy. However, MDI importances, which are the most
+popular form of tree-based importance, will fail. This is because for each
+possible initial split in a tree, each candidate feature yields a variance
+reduction of exactly 0, so the root node will get nothing. The tree is forced to
+arbitrarily pick one of the features to serve as the root node, and assuming it
+chooses `x1`, then `x1` will not receive any credit. However, if the researcher
+is savvy enough to know this is a potential issue, then permutation importance
+can be used and will sidestep this issue.
+
+```{r toy1-multiverse}
+toy1_X <- cbind(
+  x1 = c(0, 0, 0, 1, 0, 1, 1, 1),
+  x2 = c(0, 0, 1, 0, 1, 0, 1, 1),
+  x3 = c(0, 1, 0, 0, 1, 1, 0, 1)
+)
+mv_toy1 <- make_toy_mv(toy1_X, c(0.6, 0.7, 0.8, 0.9, 0.9, 0.8, 0.7, 0.6))
+mv_toy1
+```
+
+## Regression
+
+```{r toy1-regression}
+reg_toy1 <- calc_regression(mv_toy1, "accuracy")
+coef(reg_toy1)
+cat("R^2:", summary(reg_toy1)$r.squared, "\n")
+cat("Predictions:", fitted(reg_toy1), "\n")
+```
+
+Including every interaction fits the data perfectly, but leaves no residual
+degrees of freedom:
+
+```{r toy1-regression-saturated}
+reg_toy1_full <- lm(accuracy ~ (mv_dim_x1 + mv_dim_x2 + mv_dim_x3)^3, data = mv_toy1)
+coef(reg_toy1_full)
+cat("n =", nrow(mv_toy1), " p =", length(coef(reg_toy1_full)),
+    " residual df =", df.residual(reg_toy1_full), "\n")
+cat("R^2:", summary(reg_toy1_full)$r.squared, "\n")
+```
+
+## Random forest
+
+```{r toy1-random-forest}
+rf_toy1 <- rf_importances(mv_toy1, seeds = 42)
+rf_toy1[c("mdi", "pfi", "r2")]
+cat("Predictions:", round(rf_toy1$predictions, 3), "\n")
+
+rf_toy1_nb <- rf_importances(mv_toy1, seeds = 42, bootstrap = FALSE)
+rf_toy1_nb[c("mdi", "pfi", "r2")]
+cat("Predictions (no bootstrap):", round(rf_toy1_nb$predictions, 3), "\n")
+```
+
+## fANOVA
+
+```{r toy1-fanova}
+fanova_main_total(mv_toy1, seeds = 42)
+```
+
+## DECIDE
+
+```{r toy1-decide}
+decide_total(mv_toy1)
+```
+
+# Counterexample Construction
+
+We discuss here how to create a multiverse such that regression, standard
+tree-based importances, and fANOVA all fail. Split the judgment calls into two
+groups:
+
+1. An interaction: these decisions affect the outcome only through a joint
+   interaction among themselves (their parity, in our case), so every one of
+   them has a main effect of exactly zero.
+2. One main-effect decision: this decision impacts the results through a pure
+   main effect and participates in no interactions.
+
+The importances have to be such that the interaction is more important than the
+main effect. This means each decision in the interaction must move the outcome
+more than the main-effect decision does in every background context. Every
+surrogate-based importance then fails, putting the main-effect decision before
+the decisions comprising the interaction:
+
+- Linear regression can only see main effects unless the analyst names the
+  right interaction terms in advance, so the interacting group receives
+  coefficients of zero. Naming all the interactions instead saturates the model
+  ($p = n$) and destroys inference.
+- MDI is greedy. Splitting on any single member of the interacting group
+  reduces impurity by exactly zero, so the group's contribution is only paid
+  out deep in the tree, and is then divided among its members. The main effect
+  is in a single split at the root and is credited to one decision.
+- Permutation importance measures how much a decision impacts the forest's
+  predictions. Thus, if the model doesn't properly learn the multiverse
+  structure, it doesn't have the right idea of decision importances.
+- fANOVA also relies on the forest's predictions, and thus has the same
+  drawback as permutation importance.
+
+How much this setup breaks the above methods is dictated by the number of
+decisions in the interacting group: the more decisions, the more wrong
+permutation importance and fANOVA become. Toy #2 uses four interacting
+decisions, the minimal version below uses two.
+
+# Toy Multiverse #2
+
+**Regression fails; RF predictions fail; MDI importances fail; permutation
+importances fail.**
+
+Decisions `s1`--`s4` act on accuracy only through their joint (four-way)
+interaction: accuracy is high when an even number of them are set to 1 and low
+otherwise, so each of them has a main effect of exactly zero. Decision `s5`
+acts through a main effect with no interactions. `s1`--`s4` matter strictly
+more than `s5` in every universe: switching any one of `s1`--`s4` moves accuracy
+by 0.06, whereas switching `s5` moves it by 0.04.
+
+Permutation importance fails because of bagging. With bootstrapping (the
+default in every package) each universe is out-of-bag for roughly 37% of the
+trees. A tree that has the universe in-bag reproduces its accuracy exactly; a
+tree that does not has to predict it from neighbouring universes, and for a
+pure interaction those neighbours carry no information about it.
+
+```{r toy2-multiverse}
+# balanced / full factorial: 2^5 = 32 universes, in the same order as Python's
+# itertools.product (first decision varies slowest)
+toy2_X <- as.matrix(expand_grid(s1 = 0:1, s2 = 0:1, s3 = 0:1, s4 = 0:1, s5 = 0:1))
+# accuracy is BASE +/- A according to the parity of s1..s4, plus a flat D for s5
+BASE <- 0.80; A <- 0.03; D <- 0.04
+mv_toy2 <- make_toy_mv(toy2_X, BASE + A * (-1)^rowSums(toy2_X[, 1:4]) + D * toy2_X[, 5])
+cat("n universes:", nrow(mv_toy2), "\n")
+cat("distinct accuracies:", sort(unique(mv_toy2$accuracy)), "\n")
+```
+
+## DECIDE
+
+The total effect ranks `s1`--`s4` above `s5`, by the correct factor of 2.25:
+
+```{r toy2-decide}
+decide_total(mv_toy2)
+```
+
+## Regression
+
+The four interacting decisions get coefficients of exactly zero:
+
+```{r toy2-regression}
+reg_toy2 <- calc_regression(mv_toy2, "accuracy")
+round(coef(reg_toy2), 5)
+cat("R^2:", summary(reg_toy2)$r.squared, "\n")
+```
+
+Including every interaction restores the fit but leaves no residual degrees of
+freedom:
+
+```{r toy2-regression-saturated}
+reg_toy2_full <- lm(accuracy ~ (mv_dim_s1 + mv_dim_s2 + mv_dim_s3 + mv_dim_s4 + mv_dim_s5)^5, data = mv_toy2)
+cat("n =", nrow(mv_toy2), " p =", length(coef(reg_toy2_full)),
+    " residual df =", df.residual(reg_toy2_full), "\n")
+cat("R^2:", summary(reg_toy2_full)$r.squared, "\n")
+```
+
+## Random forest
+
+Averaged over 10 seeds, so the conclusion does not rest on tie-breaking:
+
+```{r toy2-random-forest}
+rf_toy2 <- rf_importances(mv_toy2, seeds = 0:9)
+round(rbind(MDI = colMeans(rf_toy2$mdi), PFI = colMeans(rf_toy2$pfi)), 5)
+cat("seeds where s5 outranks all of s1-s4: MDI",
+    sum(rf_toy2$mdi[, 5] > apply(rf_toy2$mdi[, 1:4], 1, max)), "/ 10, PFI",
+    sum(rf_toy2$pfi[, 5] > apply(rf_toy2$pfi[, 1:4], 1, max)), "/ 10\n")
+```
+
+## fANOVA
+
+```{r toy2-fanova}
+fanova_main_total(mv_toy2, seeds = 42)
+```
+
+# A Minimal Version
+
+- `s1` and `s2` act only through their pairwise interaction.
+- `s3` is a pure main effect.
+
+Switching `s1` or `s2` moves accuracy by 0.05 in every background context,
+switching `s3` moves it by 0.04. This is the multiverse in Section 4 of the
+paper (Figure 4 and Table 1).
+
+```{r minimal-multiverse}
+min_X <- as.matrix(expand_grid(s1 = 0:1, s2 = 0:1, s3 = 0:1))
+MIN_BASE <- 0.80; MIN_A <- 0.025; MIN_D <- 0.04
+mv_min <- make_toy_mv(min_X, MIN_BASE + MIN_A * (-1)^rowSums(min_X[, 1:2]) + MIN_D * min_X[, 3])
+mv_min
+```
+
+## DECIDE
+
+```{r minimal-decide}
+decide_min <- decide_total(mv_min)
+decide_min
+```
+
+## Regression
+
+```{r minimal-regression}
+reg_min <- calc_regression_importance(mv_min, "accuracy")[paste0("mv_dim_", colnames(min_X))]
+round(reg_min, 5)
+cat("R^2:", summary(calc_regression(mv_min, "accuracy"))$r.squared, "\n")
+```
+
+## Random forest
+
+```{r minimal-random-forest}
+rf_min <- rf_importances(mv_min, seeds = 0:9)
+round(rbind(MDI = colMeans(rf_min$mdi), PFI = colMeans(rf_min$pfi)), 5)
+
+rf_min_nb <- rf_importances(mv_min, seeds = 0:9, bootstrap = FALSE)
+round(rbind(MDI = colMeans(rf_min_nb$mdi), PFI = colMeans(rf_min_nb$pfi)), 5)
+```
+
+## fANOVA
+
+With the `fanova` package's default forest (a bootstrap sample per tree, 70% of
+the decisions considered at each split), averaged over 10 seeds:
+
+```{r minimal-fanova}
+fanova_min <- fanova_main_total(mv_min, seeds = 0:9)
+fanova_min
+```
+
+With an interpolating forest (no bootstrapping, every decision considered at
+each split), fANOVA's total effects recover DECIDE's ranking (as shares of the
+total variance), while its main effects still give the interacting decisions
+nothing:
+
+```{r minimal-fanova-interpolated}
+fanova_main_total(mv_min, seeds = 0:9, bootstrapping = FALSE, max_features = ncol(min_X))
+decide_min / pop_var(mv_min$accuracy)
+```
+
+## Table 1
+
+The importances of every method on the minimal multiverse, with the most
+important decision(s) per method in bold, as written to
+`tables/toy-importance-comparison.tex`:
+
+```{r minimal-table}
+toy_table <- tibble(
+  decision = c("$c_1$", "$c_2$", "$c_3$"),
+  decide_total = unname(decide_min),
+  regression = unname(reg_min),
+  fanova_main = fanova_min$main,
+  fanova_total = fanova_min$total,
+  mdi = unname(colMeans(rf_min$mdi)),
+  pfi = unname(colMeans(rf_min$pfi))
+) |>
+  # bold the most important decision(s) per column (ties are all bolded)
+  mutate(across(-decision, \(values) if_else(
+    abs(values - max(values)) <= 1e-9 * abs(max(values)),
+    sprintf("\\textbf{%.6f}", values),
+    sprintf("%.6f", values)
+  )))
+
+toy_kbl <- knitr::kable(
+  toy_table,
+  format = "latex",
+  booktabs = TRUE,
+  escape = FALSE,
+  linesep = "",
+  align = c("l", rep("c", 6)),
+  caption = paste(
+    "Comparison of decision importance scores on the multiverse shown in",
+    "Figure~\\ref{fig:mv-proxy-counterexample}. Only $\\method_\\texttt{total}$",
+    "correctly identifies that the interacting decisions ($c_1, c_2$) have a",
+    "higher importance than the main effect decision ($c_3$)."
+  ),
+  label = "toy-importance-comparison",
+  col.names = c("", "$\\method_{\\texttt{total}}$", "Reg.", "Main", "Total", "MDI", "PFI")
+) |>
+  kableExtra::add_header_above(c(" " = 3, "fANOVA" = 2, "Random Forest" = 2))
+
+cat(as.character(toy_kbl))
+
+tables_dir <- here::here("tables")
+if (!dir.exists(tables_dir)) dir.create(tables_dir, recursive = TRUE)
+writeLines(as.character(toy_kbl), file.path(tables_dir, "toy-importance-comparison.tex"))
+```
+
+# Notes
+
+## Permutation importance without bootstrapping
+
+If we turn bagging off, permutation importance works perfectly here. This will
+always be true, since a fully-grown, non-bootstrapped forest interpolates the
+multiverse, so its predictions for each permuted row witness the change in the
+true accuracy. Writing $p_{-i}$ for the background context and $s_i, s_i'$ for
+two independent draws of decision $i$, the mean-squared-error permutation
+importance is
+
+$$
+PFI(i) = \mathbb{E}\left[\left(f(s_i, p_{-i}) - f(s_i', p_{-i})\right)^2\right]
+= 2\,\mathbb{E}_{p_{-i}}\left[\mathrm{Var}_{s_i}(f)\right]
+= 2 \cdot \mathrm{DECIDE}(i),
+$$
+
+up to an $O(1/n)$ correction from permuting without replacement. Permutation
+importance and the DECIDE total effect are then the same statistic up to a
+factor of two.
+
+## Connections to fANOVA
+
+fANOVA also fails, and does so worse than permutation importance. This is
+because **fANOVA is the DECIDE decomposition of the forest's predictions rather
+than of the multiverse.** Its total importance for decision $i$ is
+$\mathbb{E}[\mathrm{Var}(\hat f \mid X_{-i})]$, the total effect of $i$
+evaluated on $\hat f$ instead of $f$. Thus, if the surrogate model is wrong,
+fANOVA is also wrong. Unlike permutation importance, which is scored against
+the true outcomes and thus can partially recover, fANOVA never looks at the
+true outcomes once the forest is fit.
+
+Turning off bootstrapping is not enough to fix the method, because `fanova`
+also sets `max_features = (n_features * 7) // 10`: only 70% of the decisions
+are considered at each split, which on its own prevents the forest from
+reconstructing a high-order interaction. Any surrogate randomization that stops
+the forest from interpolating produces this failure.
+
+When fANOVA does interpolate (setting `max_features` to the number of
+decisions), it returns rescaled DECIDE importances. This is the same collapse
+we saw for permutation importance: on a balanced multiverse, fANOVA on an
+interpolating surrogate is DECIDE, computed the expensive way through a model
+that can only lose information.
