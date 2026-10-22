@@ -106,7 +106,7 @@ ablation_yrbs$intra_method_stability_summary |>
 
 ```{r yrbs-ablation-intra-method-plot}
 #| fig-width: 2.5
-#| fig-height: 1.9
+#| fig-height: 2.1
 p_intra_yrbs <- vis_intra_method_stability(
   ablation_yrbs$intra_method_stability_summary,
   include_negative = TRUE,
@@ -114,7 +114,10 @@ p_intra_yrbs <- vis_intra_method_stability(
   fill_option = "cividis",
   decision_order = decision_order_yrbs,
   value_size = 1.6
-) + theme_stability_compact()
+) + theme_stability_compact() +
+  # the legend is taller than this short heatmap; the extra 0.2in of height
+  # goes into the top margin, so the panel keeps its size
+  theme(plot.margin = margin(16.4, 2, 2, 2))
 p_intra_yrbs
 ```
 
@@ -122,5 +125,5 @@ p_intra_yrbs
 # the intra-method heatmap is sized to match the tiles, text and legend of
 # the inter-method matrix, so the two can be placed side by side
 ggsave(here("figures", "yrbs-ablation-inter-method.pdf"), p_inter_yrbs, width = 3.2, height = 2.5, create.dir = TRUE)
-ggsave(here("figures", "yrbs-ablation-intra-method.pdf"), p_intra_yrbs, width = 2.5, height = 1.9, create.dir = TRUE)
+ggsave(here("figures", "yrbs-ablation-intra-method.pdf"), p_intra_yrbs, width = 2.5, height = 2.1, create.dir = TRUE)
 ```
