@@ -352,10 +352,13 @@ vis_intra_method_stability <- function (intra_method_stability_summary,
   plot
 }
 
-# Compact styling for the stability heatmaps as small paper figures (e.g. two
-# side by side at 3.2in wide): smaller text, multi-word decision names wrapped
-# onto separate lines, and a slim colour legend at the side. Use together with
-# `value_size = 1.6` in the heatmap functions. `left_margin` (in points) leaves
+# Compact styling for the stability heatmaps as small paper figures: smaller
+# text, multi-word decision names wrapped onto separate lines, and a slim colour
+# legend at the side. Use together with `value_size = 1.6` in the heatmap
+# functions. For figures placed side by side, size each one so that its tiles
+# come out at about 0.25in and include them at the same scale (widths in
+# proportion to their saved widths); the legend is about 1.35in tall, so
+# heatmaps with only a few rows need some extra height. `left_margin` (in points) leaves
 # room for the first rotated x-axis label when it is wider than the decision
 # names, e.g. the long method pairs of the inter-method heatmap (use 22 there).
 # Pass `wrap_y_labels = FALSE` for plots with their own y scale, such as

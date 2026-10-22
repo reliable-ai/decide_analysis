@@ -233,8 +233,8 @@ p_inter_fert
 ```
 
 ```{r fertility-ablation-inter-method-matrix}
-#| fig-width: 3.2
-#| fig-height: 2.9
+#| fig-width: 3.6
+#| fig-height: 3.25
 # method pairs on the full multiverse (upper) and averaged over all ablated
 # multiverses (lower), i.e. the rows of the heatmap above
 p <- vis_inter_method_matrix(
@@ -243,7 +243,7 @@ p <- vis_inter_method_matrix(
   value_size = 1.6
 ) + theme_stability_compact(wrap_y_labels = FALSE)
 p
-ggsave(here("figures", "fertility-ablation-inter-method-matrix.pdf"), p, width = 3.2, height = 2.9, create.dir = TRUE)
+ggsave(here("figures", "fertility-ablation-inter-method-matrix.pdf"), p, width = 3.6, height = 3.25, create.dir = TRUE)
 ```
 
 ## Intra-method stability
@@ -264,8 +264,8 @@ ablation_fert$intra_method_stability_summary |>
 ```
 
 ```{r fertility-ablation-intra-method-plot}
-#| fig-width: 3.2
-#| fig-height: 3
+#| fig-width: 2.35
+#| fig-height: 2.15
 p_intra_fert <- vis_intra_method_stability(
   ablation_fert$intra_method_stability_summary,
   include_negative = FALSE,
@@ -276,10 +276,10 @@ p_intra_fert
 ```
 
 ```{r fertility-ablation-save-heatmaps}
-# same panel size and position in both saved heatmaps, so they line up side by side
-aligned_fert <- align_stability_plots(p_inter_fert, p_intra_fert)
-ggsave(here("figures", "fertility-ablation-inter-method.pdf"), aligned_fert[[1]], width = 3.2, height = 3, create.dir = TRUE)
-ggsave(here("figures", "fertility-ablation-intra-method.pdf"), aligned_fert[[2]], width = 3.2, height = 3, create.dir = TRUE)
+# the intra-method heatmap is sized to match the tiles, text and legend of
+# the inter-method matrix, so the two can be placed side by side
+ggsave(here("figures", "fertility-ablation-inter-method.pdf"), p_inter_fert, width = 3.2, height = 3, create.dir = TRUE)
+ggsave(here("figures", "fertility-ablation-intra-method.pdf"), p_intra_fert, width = 2.35, height = 2.15, create.dir = TRUE)
 ```
 
 

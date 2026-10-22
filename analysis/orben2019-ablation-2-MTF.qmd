@@ -103,8 +103,8 @@ ggsave(here("figures", "mtf-ablation-inter-method.pdf"), p, width = 3.2, height 
 ```
 
 ```{r mtf-ablation-inter-method-matrix}
-#| fig-width: 3.2
-#| fig-height: 2.9
+#| fig-width: 3.5
+#| fig-height: 3
 # method pairs on the full multiverse (upper) and averaged over all ablated
 # multiverses (lower), i.e. the rows of the heatmap above
 p <- vis_inter_method_matrix(
@@ -115,7 +115,7 @@ p <- vis_inter_method_matrix(
   value_size = 1.6
 ) + theme_stability_compact(wrap_y_labels = FALSE)
 p
-ggsave(here("figures", "mtf-ablation-inter-method-matrix.pdf"), p, width = 3.2, height = 2.9, create.dir = TRUE)
+ggsave(here("figures", "mtf-ablation-inter-method-matrix.pdf"), p, width = 3.5, height = 3, create.dir = TRUE)
 ```
 
 ### Intra-method stability
@@ -132,8 +132,8 @@ ablation_mtf$intra_method_stability_summary |>
 ```
 
 ```{r mtf-ablation-intra-method-plot}
-#| fig-width: 3.2
-#| fig-height: 4
+#| fig-width: 2.15
+#| fig-height: 1.95
 p <- vis_intra_method_stability(
   ablation_mtf$intra_method_stability_summary,
   include_negative = TRUE,
@@ -143,5 +143,5 @@ p <- vis_intra_method_stability(
   value_size = 1.6
 ) + theme_stability_compact()
 p
-ggsave(here("figures", "mtf-ablation-intra-method.pdf"), p, width = 3.2, height = 4, create.dir = TRUE)
+ggsave(here("figures", "mtf-ablation-intra-method.pdf"), p, width = 2.15, height = 1.95, create.dir = TRUE)
 ```
