@@ -269,6 +269,92 @@ vis_inter_method_matrix <- function (inter_method_stability_summary,
   plot
 }
 
+# Half-matrix view of inter-method stability on the full multiverse alone, for
+# multiverses without an ablation: a single
+# triangular correlation matrix of the method pairs, laid out like the upper
+# (full multiverse) triangle of vis_inter_method_matrix(), with top and right
+# axes. Rows from ablated multiverses are ignored.
+vis_inter_method_half_matrix <- function (inter_method_stability_summary,
+                                          title = "Full Multiverse",
+                                          show_values = TRUE,
+                                          fill_label = "Mean rank\ncorrelation",
+                                          fill_option = "viridis",
+                                          include_negative = TRUE,
+                                          show_diagonal = TRUE,
+                                          diagonal_fill = "black",
+                                          value_size = 3) {
+  pair_data <- inter_method_stability_summary |>
+    filter(fixed_decision == "full_multiverse") |>
+    mutate(
+      # order the two methods within each pair canonically, so that each pair
+      # falls into the upper triangle
+      swap_methods = method_rank(method_x) > method_rank(method_y),
+      method_first = if_else(swap_methods, method_y, method_x),
+      method_second = if_else(swap_methods, method_x, method_y)
+    )
+
+  # methods run left to right and top to bottom; the earlier method of a pair
+  # is on the y-axis
+  methods <- order_methods(c(pair_data$method_first, pair_data$method_second))
+  n_methods <- length(methods)
+  row_y <- function (method) n_methods + 1 - match(method, methods)
+
+  plot_data <- pair_data |>
+    mutate(
+      x = match(method_second, methods),
+      y = row_y(method_first),
+      correlation_label = if_else(
+        is.na(mean_rank_correlation),
+        "NA",
+        # round first and add 0, so that values rounding to zero from below
+        # show as 0.00 rather than -0.00
+        formatC(round(mean_rank_correlation, 2) + 0, digits = 2, format = "f")
+      ),
+      label_color = stability_label_color(mean_rank_correlation, include_negative)
+    )
+
+  # without the diagonal, the first column and last row are empty
+  first_methods <- if (show_diagonal) methods else head(methods, -1)
+  second_methods <- if (show_diagonal) methods else methods[-1]
+
+  pad <- 0.15
+  limits <- c(n_methods - length(first_methods) + 0.5 - pad, n_methods + 0.5 + pad)
+
+  plot <- ggplot(plot_data, aes(x = x, y = y)) +
+    geom_tile(aes(fill = mean_rank_correlation), width = 1, height = 1) +
+    stability_fill_scale(include_negative, fill_option) +
+    scale_x_continuous(
+      breaks = match(second_methods, methods),
+      labels = nn(second_methods),
+      position = "top"
+    ) +
+    scale_y_continuous(
+      breaks = row_y(first_methods),
+      labels = nn(first_methods),
+      position = "right"
+    ) +
+    coord_equal(xlim = limits, ylim = limits, expand = FALSE, clip = "off") +
+    labs(x = NULL, y = NULL, fill = fill_label, title = title) +
+    theme_classic() +
+    theme(
+      axis.text.x.top = element_text(angle = 45, hjust = 0),
+      plot.title = element_text(face = "bold", size = rel(1), hjust = 1)
+    )
+
+  if (show_diagonal) {
+    diagonal_data <- tibble(x = seq_len(n_methods), y = row_y(methods))
+    plot <- plot +
+      geom_tile(data = diagonal_data, fill = diagonal_fill, width = 1, height = 1)
+  }
+
+  if (show_values) {
+    plot <- plot + geom_text(aes(label = correlation_label, color = label_color), size = value_size) +
+      scale_color_identity()
+  }
+
+  plot
+}
+
 vis_intra_method_stability <- function (intra_method_stability_summary,
                                         show_values = TRUE,
                                         add_average = TRUE,

@@ -380,6 +380,57 @@ compose_importance_table(
 )
 ```
 
+### Method comparison
+
+Methods are only compared on the full multiverse, as an ablation is not
+meaningful here. With only three decisions, each importance vector has three
+entries, so these correlations rest on very few points. FANOVA total is not
+computed for practical reasons.
+
+```{r mtf-full-run}
+# y_variable only varies for the x_variables that were run with several
+# y_variables (5 of 13); for the other 8 it does not apply
+full_x <- mv_mtf |>
+  distinct(mv_dim_x_variable, mv_dim_y_variable) |>
+  count(mv_dim_x_variable) |>
+  filter(n > 1) |>
+  pull(mv_dim_x_variable) |>
+  as.character()
+
+inter_method_mtf <- calc_importance_methods(
+  mv_mtf,
+  colname_metric = "effect",
+  regression_mv_pre_process = expand_y_variable,
+  regression_post_process = aggregate_onehot_importances,
+  fanova_mv_pre_process = expand_y_variable,
+  fanova_post_process = aggregate_onehot_importances,
+  include_fanova_total = FALSE,
+  conditional_decisions = list(
+    mv_dim_y_variable = list(mv_dim_x_variable = full_x)
+  )
+) |>
+  tidy_importance_methods() |>
+  mutate(fixed_decision = "full_multiverse", fixed_option = "all") |>
+  calc_inter_method_stability(cor_method = "pearson") |>
+  summarise_inter_method_stability()
+inter_method_mtf |>
+  select(method_x, method_y, mean_rank_correlation)
+```
+
+```{r mtf-ablation-inter-method-matrix}
+#| fig-width: 2.6
+#| fig-height: 2.2
+p <- vis_inter_method_half_matrix(
+  inter_method_mtf,
+  include_negative = TRUE,
+  fill_label = "Pearson\ncorrelation",
+  fill_option = "plasma",
+  value_size = 1.6
+) + theme_stability_compact(wrap_y_labels = FALSE)
+p
+ggsave(here("figures", "mtf-ablation-inter-method-matrix.pdf"), p, width = 2.6, height = 2.2, create.dir = TRUE)
+```
+
 ---
 
 # MCS Total
@@ -504,4 +555,41 @@ compose_importance_table(
   label = "importance-mcs",
   digits = 5
 )
+```
+
+### Method comparison
+
+As for MTF, methods are only compared on the full multiverse and the FANOVA
+total is not computed for practical reasons.
+
+```{r mcs-full-run}
+inter_method_mcs <- calc_importance_methods(
+  mv_mcs,
+  colname_metric = "effect",
+  regression_mv_pre_process = expand_y_variable,
+  regression_post_process = aggregate_onehot_importances,
+  fanova_mv_pre_process = expand_y_variable,
+  fanova_post_process = aggregate_onehot_importances,
+  include_fanova_total = FALSE
+) |>
+  tidy_importance_methods() |>
+  mutate(fixed_decision = "full_multiverse", fixed_option = "all") |>
+  calc_inter_method_stability(cor_method = "pearson") |>
+  summarise_inter_method_stability()
+inter_method_mcs |>
+  select(method_x, method_y, mean_rank_correlation)
+```
+
+```{r mcs-ablation-inter-method-matrix}
+#| fig-width: 2.6
+#| fig-height: 2.2
+p <- vis_inter_method_half_matrix(
+  inter_method_mcs,
+  include_negative = TRUE,
+  fill_label = "Pearson\ncorrelation",
+  fill_option = "plasma",
+  value_size = 1.6
+) + theme_stability_compact(wrap_y_labels = FALSE)
+p
+ggsave(here("figures", "mcs-ablation-inter-method-matrix.pdf"), p, width = 2.6, height = 2.2, create.dir = TRUE)
 ```
