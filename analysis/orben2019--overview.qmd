@@ -248,6 +248,7 @@ vis_importance_2dim(
 compose_importance_table(
   decide = decide_yrbs,
   fanova_main = calc_fanova_main_importance(mv_yrbs_onehot, colname_metric = "effect") |> aggregate_onehot_importances(),
+  fanova_total = calc_fanova_total_importance(mv_yrbs_onehot, colname_metric = "effect") |> aggregate_onehot_importances(),
   regression = regimp_yrbs,
   caption = "Importance estimates per decision, by method (Orben 2019, YRBS).",
   label = "importance-yrbs",
