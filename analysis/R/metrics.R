@@ -24,6 +24,20 @@ pop_var <- function (x) {
   return(mean((x - mean(x))^2))
 }
 
+# `f` applied to `values` within each group of `data` formed by `cols`, as a
+# tibble of the group keys plus the results in column `name`. Gives the same
+# result, in the same (sorted) group order, as
+# data |> group_by(across(all_of(cols))) |> summarise(name = f(values)), but
+# calls `f` directly on each group's values instead of through dplyr's data
+# mask, which is much faster with many small groups.
+summarise_by_group <- function (data, cols, values, f, name = "v") {
+  grouped <- data |> group_by(across(all_of(cols)))
+  result <- dplyr::group_keys(grouped)
+  # (namespaced, since kableExtra masks group_rows())
+  result[[name]] <- vapply(dplyr::group_rows(grouped), \(rows) f(values[rows]), numeric(1))
+  return(result)
+}
+
 # Order the judgment calls chronologically and subset the results to the
 # columns that apply for our analysis. Judgment call columns are renamed to
 # carry `dim_prefix` if they do not already, which is how this port marks a
@@ -328,11 +342,7 @@ decide <- function (
   # summary value per group
   summarize_groups <- function (cols, used = NULL) {
     data <- if (is.null(used)) mv else mv[used, ]
-    return(
-      data |>
-        group_by(across(all_of(cols))) |>
-        summarise(v = summary(.data[[colname_metric]]), .groups = "drop")
-    )
+    return(summarise_by_group(data, cols, data[[colname_metric]], summary))
   }
 
   # --- total effects: sparse-multiverse-safe total effect of every subset ---
@@ -363,9 +373,8 @@ decide <- function (
     combos <- global_means |> select(all_of(target_dims))
 
     # one realised outcome per (background context, combination of target_dims);
-    # on duplicates the last one wins, as when building a dict in Python
+    # check_and_merge_decisions() has already ruled out duplicate universes
     realised <- mv |> select(all_of(c(other_dims, target_dims)), v = all_of(colname_metric))
-    realised <- realised[!duplicated(realised[c(other_dims, target_dims)], fromLast = TRUE), ]
 
     contexts <- mv |> select(all_of(other_dims)) |> distinct()
 
@@ -407,9 +416,7 @@ decide <- function (
         }
       ))
       if (nrow(hits) == 0) next
-      resolved <- hits |>
-        group_by(.cell) |>
-        summarise(v_matched = summary(v), .groups = "drop")
+      resolved <- summarise_by_group(hits, ".cell", hits$v, summary, name = "v_matched")
       matched <- bind_rows(matched, resolved)
       unresolved <- unresolved |> filter(!.cell %in% resolved$.cell)
     }
@@ -422,12 +429,11 @@ decide <- function (
 
     # each background context gets a full comparable set: its realised outcomes,
     # plus the matched counterfactuals for the combinations it never realised
-    phi <- expand_grid(contexts, combos) |>
+    comparable_sets <- expand_grid(contexts, combos) |>
       left_join(realised, by = c(other_dims, target_dims)) |>
       left_join(filled, by = c(other_dims, target_dims)) |>
-      mutate(v = coalesce(v, v_filled)) |>
-      group_by(across(all_of(other_dims))) |>
-      summarise(phi = spread(v), .groups = "drop")
+      mutate(v = coalesce(v, v_filled))
+    phi <- summarise_by_group(comparable_sets, other_dims, comparable_sets$v, spread, name = "phi")
 
     # This addresses the case where the decision doesn't apply in some
     # backgrounds, but is still listed there (thus, there is no difference in
@@ -437,9 +443,17 @@ decide <- function (
     # matter, so we only report this proportion by default, and leave these
     # backgrounds out if the user asks to exclude them (recommended if they
     # know a priori that the decision doesn't apply in some backgrounds).
-    inert <- realised |>
+    # (counted from the group sizes rather than group by group; both groupings
+    # have the same background contexts, so their groups line up)
+    by_context <- realised |> group_by(across(all_of(other_dims)))
+    num_universes <- lengths(dplyr::group_rows(by_context))
+    num_values <- realised |>
+      distinct(across(all_of(other_dims)), v) |>
       group_by(across(all_of(other_dims))) |>
-      summarise(inert = n() >= 2 & n_distinct(v) == 1, .groups = "drop")
+      dplyr::group_rows() |>
+      lengths()
+    inert <- dplyr::group_keys(by_context) |>
+      mutate(inert = num_universes >= 2 & num_values == 1)
     phi <- phi |> left_join(inert, by = other_dims)
     included <- if (exclude_inert) !phi$inert else rep(TRUE, nrow(phi))
 
