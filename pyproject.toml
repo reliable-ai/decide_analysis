@@ -1,5 +1,5 @@
 [project]
-name = "pcs-multiverse"
+name = "decide-analysis"
 version = "0.1.0"
 description = "Multiverse analyses and decision importance metrics (DECIDE)"
 readme = "README.md"
